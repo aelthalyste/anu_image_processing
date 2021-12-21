@@ -1,0 +1,10 @@
+﻿deprecated/*
+vtune_output/*
+*.exe
+*.exp
+*.pdb
+*.json
+*.o
+*.txt
+*.ilk
+*.lib
