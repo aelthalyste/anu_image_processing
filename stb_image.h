@@ -384,9 +384,7 @@ enum
 typedef unsigned char stbi_uc;
 typedef unsigned short stbi_us;
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 #ifndef STBIDEF
 #ifdef STB_IMAGE_STATIC
@@ -532,9 +530,7 @@ STBIDEF char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int 
 STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const char *ibuffer, int ilen);
 
 
-#ifdef __cplusplus
 }
-#endif
 
 //
 //
@@ -600,19 +596,11 @@ STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const ch
 #define STBI_ASSERT(x) assert(x)
 #endif
 
-#ifdef __cplusplus
 #define STBI_EXTERN extern "C"
-#else
-#define STBI_EXTERN extern
-#endif
 
 
 #ifndef _MSC_VER
-   #ifdef __cplusplus
    #define stbi_inline inline
-   #else
-   #define stbi_inline
-   #endif
 #else
    #define stbi_inline __forceinline
 #endif

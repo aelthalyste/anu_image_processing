@@ -76,7 +76,7 @@ int main() {
     }
     LOG_INFO("Warmup done!");
 
-    for_n (_overloop, 100) {
+    for_n (_overloop, 1) {
         for_array (_i, images) {
 			s64 start = start_prof();
 		
@@ -87,23 +87,19 @@ int main() {
             // draw_rectangle(images[_i], w, h, channels, { 0,0,200,200 });
             process_image_count += 1;
             total_bytes_processed += (u64)w * h * channels;
+            total_ms += time_elapsed_ms(start);
 
-            // char bf[1024];
-            // memset(bf, 0, sizeof(bf));
-            // sprintf(bf, "C:\\w\\anu_tests\\output\\output_%s", path_file_name(files[_i]));
-            // stbi_write_bmp(bf, w, h, channels, images[_i]);
-            // 
-            // sprintf(bf, "%s\\mini_output_%s", output_path, path_file_name(files[_i]));
-            // stbi_write_bmp(bf, output.downsampled_mask.w, output.downsampled_mask.h, 1, output.downsampled_mask.mask);
-            // printf("output target : %s\n", bf);
-			total_ms += time_elapsed_ms(start);
-			
+            char bf[1024];
+            memset(bf, 0, sizeof(bf));
+            sprintf(bf, "C:\\w\\anu_tests\\output\\output_%s", path_file_name(files[_i]));
+            stbi_write_bmp(bf, output.pure_mask.w, output.pure_mask.h, 1, output.pure_mask.mask);
+            printf("output target : %s\n", bf);
+
             bg_unused(output);
-
         }
         printf("loop %llu\n", _overloop);
     }
-
+    
     for_array(_i, images) {
         stbi_image_free(images[_i]);
     }

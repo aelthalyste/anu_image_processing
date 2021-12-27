@@ -14,6 +14,7 @@ init_linear_allocator(void *memory, u64 size) {
 
 
 void * Linear_Allocator::allocate(u64 size) {
+    
 
     if (size % 64 != 0)
         size += (64 - (size % 64));
@@ -35,12 +36,12 @@ void Linear_Allocator::reset() {
 
 void 
 rgb_to_ycbcr_avx2(u8 *__restrict rgb, u8 *__restrict ycbcr, RGB_YCBCR_Means *means, u64 w, u64 h, u64 channels) {
+    
+
     s64 tr = 0, tg = 0, tb = 0;
     s64 ty = 0, tcb = 0, tcr = 0;
 
-#define movdqu(a, b)  (a) = _mm_loadu_si128((__m128i *)(b))
-
-#pragma omp parallel for num_threads(10)
+#pragma omp parallel for num_threads(12)
     for (s64 y = 0; y < (s64)h; ++y) {
 
 
@@ -81,32 +82,32 @@ rgb_to_ycbcr_avx2(u8 *__restrict rgb, u8 *__restrict ycbcr, RGB_YCBCR_Means *mea
         };
 
         u8 shuffle8_layout[]  ={ 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14 };
-        u8 shuffle16_layout[] ={ 0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15, 0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15 };
+        // u8 shuffle16_layout[] ={ 0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15, 0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15 };
 
         // rgba-rgba
-        __m256i rgb_mean_vector = _mm256_setzero_si256();
+        __m128i rgb_mean_vector = _mm_setzero_si128();
         // ybra-ybra
-        __m256i mean_vector     = _mm256_setzero_si256();
+        __m128i mean_vector     = _mm_setzero_si128();
+        
         __m256i yc_vector;
         __m256i cbc_vector;
         __m256i crc_vector;
         __m256i add_vec;
         __m256i shuffle8_vec;
-        __m256i shuffle16_vec;
+        // __m256i shuffle16_vec;
 
-        yc_vector   = _mm256_loadu_si256((__m256i *) & y_constants);
-        cbc_vector  = _mm256_loadu_si256((__m256i *) & cb_constants);
-        crc_vector  = _mm256_loadu_si256((__m256i *) & cr_constants);
-        add_vec     = _mm256_loadu_si256((__m256i *) & adder_table);
-        shuffle8_vec = _mm256_loadu_si256((__m256i *) & shuffle8_layout);
-        shuffle16_vec = _mm256_loadu_si256((__m256i *) & shuffle16_layout);
+        yc_vector     = _mm256_loadu_si256((__m256i *) & y_constants);
+        cbc_vector    = _mm256_loadu_si256((__m256i *) & cb_constants);
+        crc_vector    = _mm256_loadu_si256((__m256i *) & cr_constants);
+        add_vec       = _mm256_loadu_si256((__m256i *) & adder_table);
+        shuffle8_vec  = _mm256_loadu_si256((__m256i *) & shuffle8_layout);
+        // shuffle16_vec = _mm256_loadu_si256((__m256i *) & shuffle16_layout);
 
         for (u64 x = 0; x < w; x+=4) {
 
-
             __m128i lane;
 
-            lane = _mm_loadu_si128((__m128i *) & input[x * channels]);
+            lane = _mm_loadu_si128((__m128i *) &input[x * channels]);
 
 
             // there are 4 pixels
@@ -192,62 +193,39 @@ rgb_to_ycbcr_avx2(u8 *__restrict rgb, u8 *__restrict ycbcr, RGB_YCBCR_Means *mea
            // 23 67 01 45
 
             __m256i r = _mm256_shuffle_epi8(result_ycbcr, shuffle8_vec);
-            // __m256i r2 = _mm256_shuffle_epi8(result_ycbcr, shuffle16_vec);
-            ((u64 *)output)[0] = ((u64 *)&r)[0];
-            ((u64 *)output)[1] = ((u64 *)&r)[1];
+            *((u64 *)(&output[x * channels]) + 0) = ((u64 *)&r)[0];
+            *((u64 *)(&output[x * channels]) + 1) = ((u64 *)&r)[1];
 
-            // memcpy(output, &r, 16);
+            __m128i low_r;
+            __m128i hig_r;
+            __m256i t0;
 
-#if 0
-            output[(x + 0) * channels + 0] = result_ycbcr.m256i_i16[0];
-            output[(x + 0) * channels + 1] = result_ycbcr.m256i_i16[2];
-            output[(x + 0) * channels + 2] = result_ycbcr.m256i_i16[4];
-            output[(x + 0) * channels + 3] = 0;
+            low_r = _mm256_extracti128_si256(r, 0);
+            hig_r = _mm256_extracti128_si256(r, 1);
 
-            output[(x + 1) * channels + 0] = result_ycbcr.m256i_i16[1];
-            output[(x + 1) * channels + 1] = result_ycbcr.m256i_i16[3];
-            output[(x + 1) * channels + 2] = result_ycbcr.m256i_i16[5];
-            output[(x + 1) * channels + 3] = 0;
+            t0 = _mm256_add_epi32(_mm256_cvtepu8_epi32(low_r), _mm256_cvtepu8_epi32(hig_r));
+            mean_vector = _mm_add_epi32(mean_vector, _mm_add_epi32(_mm256_extracti128_si256(t0, 0), _mm256_extracti128_si256(t0, 1)));
 
 
-            output[(x + 2) * channels + 0] = result_ycbcr.m256i_i16[8];
-            output[(x + 2) * channels + 1] = result_ycbcr.m256i_i16[10];
-            output[(x + 2) * channels + 2] = result_ycbcr.m256i_i16[12];
-            output[(x + 2) * channels + 3] = 0;
+            // low_r = _mm256_extracti128_si256(r, 0);
 
-            output[(x + 3) * channels + 0] = result_ycbcr.m256i_i16[9];
-            output[(x + 3) * channels + 1] = result_ycbcr.m256i_i16[11];
-            output[(x + 3) * channels + 2] = result_ycbcr.m256i_i16[13];
-            output[(x + 3) * channels + 3] = 0;
-#endif
+            // epi16 low-hig
+            low_r = _mm256_extracti128_si256(pixels, 0);
+            hig_r = _mm256_extracti128_si256(pixels, 1);
 
-            __m128i low_r = _mm256_extracti128_si256(result_ycbcr, 0); // low lane,  2 pixel
-            __m128i hig_r = _mm256_extracti128_si256(result_ycbcr, 1); // high line, 2 pixel
-            __m256i t0 = _mm256_cvtepi16_epi32(low_r);
-            __m256i t1 = _mm256_cvtepi16_epi32(hig_r);
-            __m256i t2 = _mm256_add_epi32(t0, t1);
-            mean_vector     = _mm256_add_epi32(mean_vector, t2);
-
-            __m128i pixels_low  = _mm256_extracti128_si256(pixels, 0); // 2 pixel
-            __m128i pixels_high = _mm256_extracti128_si256(pixels, 1); // 2 pixel
-            rgb_mean_vector = _mm256_add_epi32(rgb_mean_vector, _mm256_add_epi32(_mm256_cvtepi16_epi32(pixels_low), _mm256_cvtepi16_epi32(pixels_high)));
+            __m256i t1 = _mm256_add_epi32(_mm256_cvtepi16_epi32(low_r), _mm256_cvtepi16_epi32(hig_r));
+            rgb_mean_vector = _mm_add_epi32(rgb_mean_vector, _mm_add_epi32(_mm256_extracti128_si256(t1, 0), _mm256_extracti128_si256(t1, 1)));
 
         }
 
-        u64 tlr = 0;
-        u64 tlg = 0;
-        u64 tlb = 0;
-        u64 tly = 0;
-        u64 tlcb = 0;
-        u64 tlcr = 0;
+        u64 tly  = ((s32 *)&mean_vector)[0];
+        u64 tlcb = ((s32 *)&mean_vector)[1];
+        u64 tlcr = ((s32 *)&mean_vector)[2];
 
-
-        // tlr  = rgb_mean_vector.m256i_i32[0] + rgb_mean_vector.m256i_i32[4];
-        // tlg  = rgb_mean_vector.m256i_i32[1] + rgb_mean_vector.m256i_i32[5];
-        // tlb  = rgb_mean_vector.m256i_i32[2] + rgb_mean_vector.m256i_i32[6];
-        // tly  = mean_vector.m256i_i32[0] + mean_vector.m256i_i32[1];
-        // tlcb = mean_vector.m256i_i32[2] + mean_vector.m256i_i32[3];
-        // tlcr = mean_vector.m256i_i32[4] + mean_vector.m256i_i32[5];
+        u64 tlr = ((s32 *)&rgb_mean_vector)[0];
+        u64 tlg = ((s32 *)&rgb_mean_vector)[1];
+        u64 tlb = ((s32 *)&rgb_mean_vector)[2];
+        int hold_me_here = 0;
 
 #if 1
 
@@ -299,7 +277,7 @@ rgb_to_ycbcr(u8 *__restrict rgb, u8 *__restrict ycbcr, RGB_YCBCR_Means *means, u
     s64 ty = 0, tcb = 0, tcr = 0;
 
     
-#pragma omp parallel for
+#pragma omp parallel for num_threads(12)
     for (s64 y = 0; y < (s64)h; ++y) {
         u8 *__restrict input  = &rgb[y * w * channels];
         u8 *__restrict output = &ycbcr[y * w * channels];
@@ -334,8 +312,11 @@ rgb_to_ycbcr(u8 *__restrict rgb, u8 *__restrict ycbcr, RGB_YCBCR_Means *means, u
             tly += _y;
             tlcb += cb;
             tlcr += cr;
+
         }
         
+        int hodl_me_here= 25;
+
 #if 1
 
 #pragma omp atomic
@@ -381,6 +362,8 @@ rgb_to_ycbcr(u8 *__restrict rgb, u8 *__restrict ycbcr, RGB_YCBCR_Means *means, u
 
 void
 filter_rgb(u8 *__restrict input_rgb, u8 *__restrict output_mask, u64 w, u64 h, u64 input_channel_count) {
+    
+    
 
 #pragma omp parallel for num_threads(12)
     for (s64 _y = 0; _y < (s64)h; ++_y) {
@@ -400,6 +383,8 @@ filter_rgb(u8 *__restrict input_rgb, u8 *__restrict output_mask, u64 w, u64 h, u
 
 void
 filter_ycbcr_means(u8 *input_ycbcr, u8 *output_mask, RGB_YCBCR_Means in_means, s64 cbcrdiff_threshold, u64 w, u64 h, u64 input_channel_count) {
+    
+    
 
 #pragma omp parallel for num_threads(12)
     for (s64 _y = 0; _y < (s64)h; ++_y) {
@@ -429,6 +414,8 @@ filter_ycbcr_means(u8 *input_ycbcr, u8 *output_mask, RGB_YCBCR_Means in_means, s
 void
 apply_binary_mask_to_image(u8 *image, u8 *binary_mask, u64 w, u64 h, u64 image_channel_count) {
     
+    
+
 #pragma omp parallel for num_threads(12)
     for (s64 _y = 0; _y < (s64)h; ++_y) {
 
@@ -452,6 +439,8 @@ apply_binary_mask_to_image(u8 *image, u8 *binary_mask, u64 w, u64 h, u64 image_c
 void
 prepare_downsample_task(u64 w, u64 h, u64 window_w, u64 window_h, Downsample_Task_List *output, Linear_Allocator *allocator) {
     
+    
+
     u64 xcount = (w + window_w - 1)/ window_w;
     u64 ycount = (h + window_h -1 )/ window_h;
     u64 tile_count = ycount * xcount;
@@ -540,7 +529,6 @@ extract_rectangles(u8 *mask, u64 w, u64 h, u64 *rectangle_count_output, Linear_A
     memcpy(temp_mask, mask, w * h);
     
     u8 visited = 0x01;
-    
 
     struct Coordinates{
         s16 x, y;
@@ -676,7 +664,7 @@ normal + openmp
 
 Process_Image_Result
 process_image(u8 *image, u64 w, u64 h, u64 channel_count, Linear_Allocator *allocator) {
-
+    
     Process_Image_Result result;
     zero_memory(&result, sizeof(result));
     result.pure_mask.w = w;
@@ -684,10 +672,9 @@ process_image(u8 *image, u64 w, u64 h, u64 channel_count, Linear_Allocator *allo
     
     u8 *ycbcr      = (u8 *)allocator->allocate(w * h * channel_count);
     u8 *ycbcr_avx2 = (u8 *)allocator->allocate(w * h * channel_count);
-    result.pure_mask.mask = (u8 *)allocator->allocate(w * h);
-    
+
+    result.pure_mask.mask = (u8 *)allocator->allocate(w * h);    
     zero_memory(ycbcr     , w * h * channel_count);
-    zero_memory(ycbcr_avx2, w * h * channel_count);
 
     Downsample_Task_List downsample_tasks;
     u64 subsample_w_window = 16;
@@ -696,25 +683,22 @@ process_image(u8 *image, u64 w, u64 h, u64 channel_count, Linear_Allocator *allo
     BG_ASSERT(ycbcr);
 
     RGB_YCBCR_Means means;
-    RGB_YCBCR_Means means_avx2;
 
-    rgb_to_ycbcr_avx2(image, ycbcr_avx2, &means_avx2, w, h, channel_count);
-    //rgb_to_ycbcr(image, ycbcr, &means, w, h, channel_count);
+    rgb_to_ycbcr_avx2(image, ycbcr, &means, w, h, channel_count);
+    // rgb_to_ycbcr(image, ycbcr, &means, w, h, channel_count);
 
     filter_ycbcr_means(ycbcr, result.pure_mask.mask, means, 38, w, h, channel_count);
     filter_rgb(image, result.pure_mask.mask, w, h, channel_count);
     apply_binary_mask_to_image(image, result.pure_mask.mask, w, h, channel_count);
     
-#if 0
     prepare_downsample_task(w, h, subsample_w_window, subsample_h_window, &downsample_tasks, allocator);
     result.downsampled_mask.w = downsample_tasks.output_width;
     result.downsampled_mask.h = downsample_tasks.output_height;
 
     result.downsampled_mask.mask = (u8 *)allocator->allocate(downsample_tasks.output_height * downsample_tasks.output_width);
     downsample_mask(result.pure_mask.mask, result.downsampled_mask.mask, w, &downsample_tasks);
-#endif
-    // u64 rect_count = 0;
-    // RectangleU16 *rectangles = extract_rectangles(result.downsampled_mask.mask, result.downsampled_mask.w, result.downsampled_mask.h, &rect_count, allocator);
+    u64 rect_count = 0;
+    RectangleU16 *rectangles = extract_rectangles(result.downsampled_mask.mask, result.downsampled_mask.w, result.downsampled_mask.h, &rect_count, allocator);
 
     
     // for (u64 i =0; i < rect_count; ++i) {
@@ -776,6 +760,7 @@ draw_line_hor(u8 *image, s64 w, s64 h, u64 channels, s64 y, s64 xs, s64 xe) {
 void 
 draw_line_ver(u8 *image, s64 w, s64 h, u64 channels, s64 x, s64 ys, s64 ye) {
     
+
     u64 line_width = 5;
     
     s64 lx = x - line_width / 2;
