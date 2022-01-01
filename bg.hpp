@@ -1,6 +1,7 @@
 #ifndef BG_H_DECLERATIONS
 #define BG_H_DECLERATIONS
 
+
 #include <stdint.h>
 #include <string.h>
 
@@ -11,46 +12,46 @@
 
 
 #if defined(_WIN32) || defined(_WIN64)
-#define BG_SYSTEM_WINDOWS 1
+    #define BG_SYSTEM_WINDOWS 1
 #elif defined(__APPLE__) && defined(__MACH__)
-#define BG_SYSTEM_OSX 1
+    #define BG_SYSTEM_OSX 1
 #elif defined(__linux__)
-#define BG_SYSTEM_LINUX 1
+    #define BG_SYSTEM_LINUX 1
 #else
-#error unsupported platform
+    #error unsupported platform
 #endif
 
 
 #if defined(_MSC_VER) && !defined(__clang__)
-#define BG_COMPILER_MSVC 1
+    #define BG_COMPILER_MSVC 1
 #elif defined(__clang__)
-#define BG_COMPILER_CLANG 1
+    #define BG_COMPILER_CLANG 1
 #elif defined(__GNUC__)
-#define BG_COMPILER_GCC 1
+    #define BG_COMPILER_GCC 1
 #else
-#error UNKNOWN COMPILER
+    #error UNKNOWN COMPILER
 #endif
 
 
 
 #if BG_SYSTEM_WINDOWS
-#define BG_DEBUGBREAK __debugbreak()
+    #define BG_DEBUGBREAK __debugbreak()
 #else 
-#define BG_DEBUGBREAK __asm__ volatile("int $0x03")
+    #define BG_DEBUGBREAK __asm__ volatile("int $0x03")
 #endif
 
 
 
 #if !defined(BG_ARR_BOUNDS_CHECK)
-#if defined(BG_DEVELOPER)
-#if BG_DEVELOPER
-#define BG_ARR_BOUNDS_CHECK 1
-#endif
-#endif
+    #if defined(BG_DEVELOPER)
+        #if BG_DEVELOPER
+            #define BG_ARR_BOUNDS_CHECK 1
+        #endif
+    #endif
 #endif
 
 #if !defined(BG_ARR_BOUNDS_CHECK)
-#define BG_ARR_BOUNDS_CHECK 0
+    #define BG_ARR_BOUNDS_CHECK 0
 #endif
 
 
@@ -67,106 +68,108 @@
 
 
 #if BG_SYSTEM_WINDOWS
-typedef uint64_t u64;
-typedef  int64_t s64;
-bg_static_assert(sizeof(s64) == sizeof(u64));
+    typedef uint64_t u64;
+    typedef  int64_t s64;
+    bg_static_assert(sizeof(s64) == sizeof(u64));
 
-typedef uint32_t u32;
-typedef  int32_t s32;
-bg_static_assert(sizeof(s32) == sizeof(u32));
+    typedef uint32_t u32;
+    typedef  int32_t s32;
+    bg_static_assert(sizeof(s32) == sizeof(u32));
 
-typedef uint16_t u16;
-typedef  int16_t s16;
-bg_static_assert(sizeof(s16) == sizeof(u16));
+    typedef uint16_t u16;
+    typedef  int16_t s16;
+    bg_static_assert(sizeof(s16) == sizeof(u16));
 
-typedef  uint8_t u8;
-typedef   int8_t s8;
-bg_static_assert(sizeof(s8) == sizeof(u8));
+    typedef  uint8_t u8;
+    typedef   int8_t s8;
+    bg_static_assert(sizeof(s8) == sizeof(u8));
 
-#define BgUtf16 wchar_t
+    #define BgUtf16 wchar_t
 #endif
 
 #if BG_SYSTEM_LINUX
-typedef unsigned long long u64;
-typedef          long long s64;
-bg_static_assert(sizeof(u64) == 8);
-bg_static_assert(sizeof(s64) == sizeof(u64));
+    typedef unsigned long long u64;
+    typedef          long long s64;
+    bg_static_assert(sizeof(u64) == 8);
+    bg_static_assert(sizeof(s64) == sizeof(u64));
 
-typedef unsigned int u32;
-typedef          int s32;
-bg_static_assert(sizeof(u32) == 4);
-bg_static_assert(sizeof(s32) == sizeof(u32));
+    typedef unsigned int u32;
+    typedef          int s32;
+    bg_static_assert(sizeof(u32) == 4);
+    bg_static_assert(sizeof(s32) == sizeof(u32));
 
-typedef unsigned short u16;
-typedef          short s16;
-bg_static_assert(sizeof(u16) == 2);
-bg_static_assert(sizeof(s16) == sizeof(u16));
+    typedef unsigned short u16;
+    typedef          short s16;
+    bg_static_assert(sizeof(u16) == 2);
+    bg_static_assert(sizeof(s16) == sizeof(u16));
 
-typedef unsigned char  u8;
-typedef          char  s8;
-bg_static_assert(sizeof(u8) == 1);
-bg_static_assert(sizeof(s8) == sizeof(u8));
+    typedef unsigned char  u8;
+    typedef          char  s8;
+    bg_static_assert(sizeof(u8) ==  1);
+    bg_static_assert(sizeof(s8) == sizeof(u8));
 
-typedef u16 BgUtf16;
+    typedef u16 BgUtf16;
 #endif
 
 #define bg_internal      static 
 #define bg_local_persist static
 
 #if BG_SYSTEM_WINDOWS
-#define BG_DLLEXPORT     __declspec(dllexport)
-#define BG_DLLIMPORT     __declspec(dllimport)
+    #define BG_DLLEXPORT     __declspec(dllexport)
+    #define BG_DLLIMPORT     __declspec(dllimport)
 #else
-#define BG_DLL_EXPORT    __attribute__((visibility("default")))
-#define BG_DLL_IMPORT 
+    #define BG_DLL_EXPORT    __attribute__((visibility("default")))
+    #define BG_DLL_IMPORT 
 #endif
 
 #if BG_SYSTEM_WINDOWS
-#if defined(BG_BUILD_AS_DLL)
-#define BG_API BG_DLLEXPORT
+    #if defined(BG_BUILD_AS_DLL)
+        #define BG_API BG_DLLEXPORT
+    #else
+        #define BG_API BG_DLLIMPORT
+    #endif
 #else
-#define BG_API BG_DLLIMPORT
-#endif
-#else
-#define BG_API
+    #define BG_API __attribute__((visibility("default")))
 #endif
 
 
 #if 1
-#include <stdio.h>
-#define LOG(str, ...)          do{BG_INTERNAL_LOG("INFO"   , str, ## __VA_ARGS__);} while (0);
-#define LOG_INFO(str, ...)     do{BG_INTERNAL_LOG("INFO"   , str, ## __VA_ARGS__);} while (0);
-#define LOG_ERROR(str, ...)    do{BG_INTERNAL_LOG("ERROR"  , str, ## __VA_ARGS__);} while (0);
-#define LOG_WARNING(str, ...)  do{BG_INTERNAL_LOG("WARNING", str, ## __VA_ARGS__);} while (0);    
-#define BG_INTERNAL_LOG(prefix, str, ...) bg__log(prefix, str, ## __VA_ARGS__);
+    #include <stdio.h>
+#if 1
+    #define LOG(str, ...)          do{BG_INTERNAL_LOG("INFO"   , str, ## __VA_ARGS__);} while (0);
+    #define LOG_INFO(str, ...)     do{BG_INTERNAL_LOG("INFO"   , str, ## __VA_ARGS__);} while (0);
+    #define LOG_ERROR(str, ...)    do{BG_INTERNAL_LOG("ERROR"  , str, ## __VA_ARGS__);} while (0);
+    #define LOG_WARNING(str, ...)  do{BG_INTERNAL_LOG("WARNING", str, ## __VA_ARGS__);} while (0);    
+    #define BG_INTERNAL_LOG(prefix, str, ...) bg__log(prefix, str, ## __VA_ARGS__);
+#endif
+
 #else
-#include <stdio.h>
-#define LOG(str, ...)          do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);
-#define LOG_INFO(str, ...)     do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);
-#define LOG_ERROR(str, ...)    do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);
-#define LOG_WARNING(str, ...)  do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);    
+    #include <stdio.h>
+    #define LOG(str, ...)          do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);
+    #define LOG_INFO(str, ...)     do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);
+    #define LOG_ERROR(str, ...)    do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);
+    #define LOG_WARNING(str, ...)  do{fprintf(stdout, str, ## __VA_ARGS__);} while (0);    
 #endif
 
 
 
 #if BG_DEVELOPER
-#if BG_COMPILER_MSVC
-#define BG_ASSERT(exp) do{if (!(exp)) { LOG_ERROR("ASSERTION FAILED : \n\tFile : " __FILE__ "\n\tFunction : " __FUNCSIG__ "\n\tLine %d\n\tExpression : " #exp "\n", __LINE__); BG_DEBUGBREAK; }} while(0);
+    #if BG_COMPILER_MSVC
+        #define BG_ASSERT(exp) do{if (!(exp)) { LOG_ERROR("ASSERTION FAILED : \n\tFile : " __FILE__ "\n\tFunction : " __FUNCSIG__ "\n\tLine %d\n\tExpression : " #exp "\n", __LINE__); BG_DEBUGBREAK; }} while(0);
+    #else
+        #define BG_ASSERT(exp) do{if (!(exp)) { LOG_ERROR("ASSERTION FAILED : \n\tFile : " __FILE__ "\n\tLine %d", __LINE__); BG_DEBUGBREAK; }} while(0);
+    #endif
 #else
-#define BG_ASSERT(exp) do{if (!(exp)) { BG_DEBUGBREAK; }} while(0);
-#endif
-#else
-#define BG_ASSERT(exp) 
+    #define BG_ASSERT(exp) 
 #endif
 
 
-
-void
-bg__log(const char *prefix, const char *fmt, ...);
+void bg_init_log_file(const char *file_name);
+void bg__log(const char *prefix, const char *fmt, ...);
 
 
 #if BG_BUILD_AS_DLL
-// #include "stb_leakcheck.h"
+    // #include "stb_leakcheck.h"
 #endif
 
 #include <stdlib.h>
@@ -188,26 +191,24 @@ bg__log(const char *prefix, const char *fmt, ...);
 
 
 #if !defined(BG_SYSTEM_WINDOWS)
-#define BG_SYSTEM_WINDOWS 0
+    #define BG_SYSTEM_WINDOWS 0
 #endif
 #if !defined(BG_SYSTEM_LINUX)
-#define BG_SYSTEM_LINUX   0
+    #define BG_SYSTEM_LINUX   0
 #endif
 #if !defined(BG_SYSTEM_OSX)
-#define BG_SYSTEM_OSX     0
+    #define BG_SYSTEM_OSX     0
 #endif
 
 #if !defined(BG_COMPILER_MSVC)
-#define BG_COMPILER_MSVC  0
+    #define BG_COMPILER_MSVC  0
 #endif
 #if !defined(BG_COMPILER_CLANG)
-#define BG_COMPILER_CLANG 0
+    #define BG_COMPILER_CLANG 0
 #endif
 #if !defined(BG_COMPILER_GCC)
-#define BG_COMPILER_GCC   0
+    #define BG_COMPILER_GCC   0
 #endif
-
-
 
 // POOL
 struct Pool_Entry {
@@ -284,6 +285,71 @@ pool_dealloc(Pool_Allocator *alloc, void *mem) {
     }
 }
 
+struct Allocator_Mark {
+    u64 internal_mark;
+};
+
+struct Linear_Allocator {
+    void *memory = NULL;
+    u64 size = 0;
+    u64 used = 0;
+    u64 aligment = 16;
+
+    void * allocate_aligned(u64 s, u64 al) {
+        
+        u64 al_bonus = (u64)((u8 *)memory + used) % al;
+        if (al_bonus)
+            al_bonus = al - al_bonus;
+        
+
+        void *result = NULL;
+        if (s + al_bonus + used < size) {
+            result = (u8 *)memory + used + al_bonus;
+            used += al_bonus + s;
+        }
+
+        return result;
+        
+    }
+
+    void * allocate(u64 s) {
+        return allocate_aligned(s, aligment);   
+    }
+
+    void * allocate_zero_aligned(u64 s, u64 al) {
+        void *result = allocate_aligned(s, al);
+        zero_memory(result, s);
+        return result;
+    }
+
+    void * allocate_zero(u64 s) {
+        void *result = allocate(s);
+        zero_memory(result, s);
+        return result;         
+    }
+
+    Allocator_Mark mark() {
+        Allocator_Mark result;
+        result.internal_mark = used;
+        return result;
+    }
+
+    void restore(Allocator_Mark mark) {
+        used = mark.internal_mark;
+    }
+
+};
+
+static inline Linear_Allocator
+init_linear_allocator(void *memory, u64 size, u64 aligment) {
+    Linear_Allocator result;
+    result.memory = memory;
+    result.size   = size;
+    result.used   = 0;
+    result.aligment = aligment;
+    return result;
+}
+
 
 // BG DATE
 struct Bg_Date {
@@ -297,17 +363,16 @@ struct Bg_Date {
 };
 
 
-Bg_Date
-get_local_date();
 
-Bg_Date
-get_utc_date();
+Bg_Date get_local_date();
+
+Bg_Date get_utc_date();
 
 
 
 #if BG_COMPILER_MSVC
-#pragma warning(push)
-#pragma warning(disable : 4626)
+    #pragma warning(push)
+    #pragma warning(disable : 4626)
 #endif
 
 
@@ -325,7 +390,7 @@ privDefer<F> defer_func(F f) {
 }
 
 #if BG_COMPILER_MSVC
-#pragma warning(pop)
+    #pragma warning(pop)
 #endif
 
 #define DEFER_1(x, y) x##y
@@ -488,10 +553,10 @@ void
 arrdel(Array<T> *arr, u64 indc) {
     BG_ASSERT(indc < arr->len);
     BG_ASSERT(indc < arr->cap);
-
+    
     if (arr->len == 0)
         return;
-
+    
     if (indc == arr->len - 1) {
         --arr->len;
         return;
@@ -503,7 +568,6 @@ arrdel(Array<T> *arr, u64 indc) {
     --arr->len;
 }
 
-#if 0
 template<typename T>
 struct Slice {
     T *data;
@@ -521,7 +585,6 @@ slice_from_array(Slice<T> *slice, Array<T> const &arr) {
     slice->data = arr.data;
     slice->len  = arr.len;
 }
-#endif
 
 
 
@@ -530,7 +593,7 @@ slice_from_array(Slice<T> *slice, Array<T> const &arr) {
 // THREADING , MUTEX, LOCKS ETC 
 //
 #if BG_SYSTEM_WINDOWS
-#include <windows.h>
+    #include <windows.h>
 #endif
 
 struct Mutex {
@@ -569,10 +632,10 @@ struct Bg_Random_State {
 static inline Bg_Random_State
 bg_init_random(u64 init_state) {
     Bg_Random_State result;
-    pcg32_random_t result_inner;
+    pcg32_random_t result_inner; 
     result_inner.state = init_state;
     result_inner.inc   = 646464;
-
+    
     result.rng = result_inner;
     return result;
 }
@@ -580,13 +643,13 @@ bg_init_random(u64 init_state) {
 
 // msvc doesn't like what pcg does here, but i dont care, didn't even read source code.
 #if BG_COMPILER_MSVC 
-#pragma warning(push)
-#pragma warning(disable : 4244)
-#pragma warning(disable : 4146)
+    #pragma warning(push)
+    #pragma warning(disable : 4244)
+    #pragma warning(disable : 4146)
 #endif
 
-static inline u32
-pcg32_random_r(pcg32_random_t *rng) {
+static inline u32 
+pcg32_random_r(pcg32_random_t* rng) {
     u64 oldstate = rng->state;
     rng->state = oldstate * 6364136223846793005ULL + rng->inc;
     u32 xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
@@ -595,7 +658,7 @@ pcg32_random_r(pcg32_random_t *rng) {
 }
 
 #if BG_COMPILER_MSVC
-#pragma warning(pop)
+    #pragma warning(pop)
 #endif
 
 static inline u64
@@ -637,7 +700,7 @@ enum File_Share_Flags {
 enum File_Open_Flags {
     File_Open_Flags_Existing,
     File_Open_Flags_New
-};
+}; 
 
 enum File_Seek_Whence {
     File_Seek_Whence_Begin,
@@ -682,7 +745,7 @@ void
 close_file_view(File_View *view);
 
 #if BG_SYSTEM_WINDOWS
-#include <windows.h>
+    #include <windows.h>
 #endif
 
 static inline bool
@@ -740,13 +803,13 @@ wait_io_completion(File *file, Async_IO_Handle *async_ctx);
 
 // write
 bool
-write_file(File *file, void *data, u64 n);
+write_file(File *file, const void *data, u64 n);
 
 Async_IO_Handle
-write_file_async(File *file, void *data, u64 n);
+write_file_async(File *file, const void *data, u64 n);
 
 IO_Result
-write__file(File *file, void *data, u64 n, s64 target_offset, Async_IO_Handle *async_handle);
+write__file(File *file, const void *data, u64 n, s64 target_offset, Async_IO_Handle *async_handle);
 
 
 // read
@@ -787,14 +850,14 @@ read_file_all(const char *fn);
 void
 free_file_read(File_Read *fr);
 
-bool
+bool 
 read_filen_last(const char *fn, void *data, u64 n);
 
 bool
 read_filen(char *fn, void *data, u64 n);
 
 bool
-dump_file(char *fn, void *d, u64 n);
+dump_file(char *fn, const void *d, u64 n);
 
 #if BG_SYSTEM_WINDOWS
 bool
@@ -804,12 +867,20 @@ bool
 copy_file_overwrite(BgUtf16 *file, BgUtf16 *dest);
 #endif
 
+#if BG_SYSTEM_WINDOWS
+Array<BgUtf16 *>
+get_file_paths_in_directory(const BgUtf16 *dir);
+
+void
+free_filelist(Array<BgUtf16 *> & list);
+
+#endif
 
 Array<char *>
 get_file_paths_in_directory(const char *dir);
 
 void
-free_filelist(Array<char *> &list);
+free_filelist(Array<char *> & list);
 
 
 
@@ -847,10 +918,10 @@ widestr_to_multibyte(const BgUtf16 *ws);
 // those two returns null if conversion can't happen(result can not fit given buffer), caller can give more memory or use memory_needed_for_conversion to determine
 // exact memory.
 char *
-widestr_to_multibyte(const BgUtf16 *ws, char *result, u64 max_ch);
+widestr_to_multibyte(const BgUtf16 *ws, char *result, u64 max_ch); 
 
 BgUtf16 *
-multibyte_to_widestr(const char *s, BgUtf16 *result, u64 max_ch);
+multibyte_to_widestr(const char *s, BgUtf16 *result, u64 max_ch); 
 #endif
 
 
@@ -975,7 +1046,7 @@ path_extract_directory(const BgUtf16 *p, BgUtf16 *out, u64 out_size) {
         out[0] = '\0';
     }
     return out;
-}
+} 
 
 
 static inline u64
@@ -1005,6 +1076,30 @@ string_copy(BgUtf16 *dest, const BgUtf16 *src) {
     }
     return result;
 }
+
+
+static inline char *
+string_find_substring(const char *src, const char *substr) {
+    
+    for (const char *n = src; *n != 0; ++n) {
+        if (*n == *substr) {
+            const char *tn = n;
+            const char *ts = substr;
+            for (; *ts != 0 && *tn != 0; ++tn, ++ts) {
+                if (*ts != *tn) {
+                    break;
+                }
+            }
+
+            if (*ts == 0) {
+                return (char *)n;
+            }
+        }
+    }
+
+    return NULL;
+}
+
 
 static inline BgUtf16 *
 string_concanate(BgUtf16 *dest, u64 dest_max, BgUtf16 *lhs, u64 lhs_len, BgUtf16 *rhs, u64 rhs_len) {
@@ -1096,21 +1191,21 @@ static inline u64
 string_to_u64(const char *str) {
 
     // with validation enabled, this runs 6x faster std lib, without this it will be 7x faster, which is about %15-18 perf gain
-    for (;; str++) {
-        if (*str == 0)
+    for (;;str++) {
+        if (*str == 0) 
             return 0;
         if (*str == '-') // there shouldnt be sign on unsigned type, :]
             return 0;
-        if (*str != ' ' && *str != '0' && is_numeric(*str))
+        if (*str != ' '  && *str != '0' && is_numeric(*str))
             break;
         if (*str != ' ' && !is_numeric(*str))
             return 0;
 
     }
-
+    
     u64 result = *str - '0';
     ++str;
-    while (is_numeric(*str)) {
+    while(is_numeric(*str)) {
         result = result * 10 + (*str - '0');
         ++str;
     }
@@ -1120,12 +1215,12 @@ string_to_u64(const char *str) {
 
 static inline s64
 string_to_s64(const char *str) {
-
+    
     s64 sign = 1;
 
     // with validation enabled, this runs 6x faster std lib, without this, it would be 7x faster, which is extra %15-18 perf gain
-    for (;; str++) {
-        if (*str == 0)
+    for (;;str++) {
+        if (*str == 0) 
             return 0;
         if (*str == '-')
             sign = -1;
@@ -1137,7 +1232,7 @@ string_to_s64(const char *str) {
 
     u64 result = *str - '0';
     ++str;
-    while (is_numeric(*str)) {
+    while(is_numeric(*str)) {
         result *= 10;
         result += (*str - '0');
         ++str;
@@ -1155,7 +1250,7 @@ to_lower(char c) {
 }
 
 #if BG_SYSTEM_LINUX
-#include <wctype.h>
+    #include <wctype.h>
 #endif
 
 static inline BgUtf16
@@ -1194,7 +1289,7 @@ string_rfind_char(char *str, char n) {
         return NULL;
 
     u64 sl = string_length(str);
-
+    
     for (s64 i = sl - 1; i >= 0; --i) {
         if (str[i] == n)
             return &str[i];
@@ -1203,6 +1298,18 @@ string_rfind_char(char *str, char n) {
     return NULL;
 }
 
+
+static inline bool
+string_equal_n(const char *s1, const char *s2, u64 n) {
+    for (u64 i = 0; i < n; i++) {
+        if (*s1 != *s2)
+            return false;
+        ++s1; ++s2;
+        if (*s1 == 0 && *s2 == 0)
+            return true;
+    }
+    return true;    
+}
 
 static inline bool
 string_equal_n(BgUtf16 *w1, BgUtf16 *w2, u64 n) {
@@ -1237,7 +1344,7 @@ string_equal_ignore_case_n(const char *s1, const char *s2, u64 n) {
             return false;
         s1++; s2++;
         if (*s1 == 0 && *s2 == 0)
-            return true;
+            return true;        
     }
     return true;
 }
@@ -1257,20 +1364,20 @@ string_equal_ignore_case(const char *s1, const char *s2) {
 static inline bool
 string_equal_ignore_case(const BgUtf16 *s1, const BgUtf16 *s2) {
     for (;;) {
-        if (to_lower(*s1) != to_lower(*s2))
+        if (to_lower(*s1) != to_lower(*s2)) 
             return false;
 
         ++s1; ++s2;
         if (*s1 == 0 && *s2 == 0)
             return true;
     }
-}
+} 
 
 static inline BgUtf16 *
 string_duplicate(const BgUtf16 *ws) {
     if (ws == NULL)
         return NULL;
-
+    
     bg_static_assert(sizeof(BgUtf16) == 2);
 
     u64 wlen = string_length(ws);
@@ -1309,13 +1416,13 @@ compare_extension(char *fp, char *ext) {
 
 static inline bool
 compare_extension_ignore_case(const char *fp, const char *ext) {
-    if (fp == NULL || ext == NULL)
+    if (fp == NULL || ext == NULL) 
         return false;
-
+    
     auto fn = path_file_name((char *)fp);
     u64 slen   = string_length(fn);
     u64 extlen = string_length(ext);
-    if (extlen > slen)
+    if (extlen > slen) 
         return false;
 
     return string_equal_ignore_case_n(fn + slen - extlen, ext, extlen);
@@ -1329,10 +1436,10 @@ compare_extension_ignore_case(const BgUtf16 *fp, const BgUtf16 *ext) {
     auto fn = path_file_name((BgUtf16 *)fp);
     u64 slen   = string_length(fn);
     u64 extlen = string_length(ext);
-    if (extlen > slen)
+    if (extlen > slen) 
         return false;
 
-    return string_equal_ignore_case_n(fn + slen - extlen, ext, extlen);
+    return string_equal_ignore_case_n(fn + slen - extlen, ext, extlen);    
 }
 
 static inline bool
@@ -1364,32 +1471,52 @@ compare_extension(const BgUtf16 *fp, const BgUtf16 *ext) {
 #ifdef BG_IMPLEMENTATION
 
 #if BG_SYSTEM_WINDOWS
-#include <Windows.h>
-#include <debugapi.h>
-#include <WinIoCtl.h>
+    #include <Windows.h>
+    #include <debugapi.h>
+    #include <WinIoCtl.h>
 #endif
 
 #if BG_SYSTEM_LINUX
-#define _LARGEFILE64_SOURCE 1    /* See feature_test_macros(7) */
-#include <sys/types.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <pthread.h>
+    #define _LARGEFILE64_SOURCE 1    /* See feature_test_macros(7) */
+    #include <sys/types.h>
+    #include <errno.h>
+    #include <sys/stat.h>
+    #include <unistd.h>
+    #include <fcntl.h>
+    #include <pthread.h>
 #endif
+
+static FILE *bg__log__internal_file = NULL;
+static Mutex bg__log__internal_mutex;
+static bool  bg__log__internal__mutex_initialized = false;
+
+#include<stdio.h>
+#include<stdarg.h>
+
+void 
+bg_init_log_file(const char *file_name) {
+    if (bg__log__internal_file == NULL) {
+        bg__log__internal_file = fopen(file_name, "ab");
+        if (!bg__log__internal__mutex_initialized) {
+            bg__log__internal_mutex = init_mutex();
+            bg__log__internal__mutex_initialized = true;
+        }
+    }
+}
 
 void
 bg__log(const char *log_prefix, const char *fmt, ...) {
+    
 
-    static FILE *file = fopen("narsqlguilog.txt", "ab");
-    static Mutex m = init_mutex();
+    if (bg__log__internal_file == NULL)
+        bg_init_log_file("narsqlguilog.txt");
 
-    lock_mutex(&m);
+    
+    lock_mutex(&bg__log__internal_mutex);
     {
         static char buf[32 * 1024];
         zero_memory(buf, sizeof(buf));
-
+        
         Bg_Date cd = get_local_date();
         // prefix size
         s32 ps = 0;
@@ -1402,7 +1529,7 @@ bg__log(const char *log_prefix, const char *fmt, ...) {
         // ERROR
         // WARNING
         // INFO
-        ps += snprintf(buf + ps, sizeof(buf) - ps, "(%-10s) : ", log_prefix);
+        ps += snprintf(buf + ps, sizeof(buf) - ps, "(%-10s) : ", log_prefix); 
 
         // actual user input
         {
@@ -1419,18 +1546,19 @@ bg__log(const char *log_prefix, const char *fmt, ...) {
             buf[bs++] = '\n';
 
 
-        fwrite(buf, bs, 1, file);
+        fwrite(buf, bs, 1, bg__log__internal_file);
 
-
+        
 #if BG_DEVELOPER
         fprintf(stdout, "%s", buf);
 #endif
 
 
     }
-    unlock_mutex(&m);
+    unlock_mutex(&bg__log__internal_mutex);
+    
+    fflush(bg__log__internal_file);
 
-    fflush(file);
 }
 
 
@@ -1456,7 +1584,7 @@ get_local_date() {
     return systemtime_to_bg_date(&w_time);
 }
 
-Bg_Date
+Bg_Date 
 get_utc_date() {
     SYSTEMTIME w_time;
     GetSystemTime(&w_time);
@@ -1464,7 +1592,38 @@ get_utc_date() {
 }
 
 #else
-#error implement time in linux
+
+#include <time.h>
+
+Bg_Date
+tm_time_to_bg_date(struct tm * tm) {
+    Bg_Date result;
+    result.year   = tm->tm_year + 1900;
+    result.month  = tm->tm_mon;
+    result.day    = tm->tm_mday;
+    result.hour   = tm->tm_hour;
+    result.minute = tm->tm_min;
+    result.second = tm->tm_sec;
+    result.millisecond = 0; //
+    return result;
+}
+
+Bg_Date
+get_utc_date() {
+    time_t t = time(NULL);
+    struct tm tm;
+    gmtime_r(&t, &tm);
+    return tm_time_to_bg_date(&tm);
+}
+
+Bg_Date
+get_local_date() {
+    time_t t = time(NULL);
+    struct tm tm;
+    localtime_r(&t, &tm);
+    return tm_time_to_bg_date(&tm); 
+}
+
 #endif
 
 
@@ -1473,13 +1632,13 @@ get_utc_date() {
 Mutex
 init_mutex() {
 #if BG_SYSTEM_WINDOWS
-    Mutex result ={};
+    Mutex result = {};
     InitializeCriticalSection(&result.critical_section);
     return result;
 #else
-    Mutex result ={};
+    Mutex result = {};
     pthread_mutex_init(&result.m, NULL);
-    return result;
+    return result; 
 #endif
 }
 
@@ -1522,7 +1681,7 @@ try_lock_mutex(Mutex *mutex) {
 }
 
 
-constexpr u32 BG__CRC32_TABLE[256] ={
+constexpr u32 BG__CRC32_TABLE[256] = {
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba,
     0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
     0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
@@ -1612,9 +1771,9 @@ memory_needed_for_conversion(const char *str, u64 slen) {
 }
 
 u64
-memory_needed_for_conversion(const BgUtf16 *str, u64 slen) {
+memory_needed_for_conversion(const BgUtf16 *str, u64 slen){
     if (slen == 0) slen = string_length(str) + 1;
-    int chneeded = WideCharToMultiByte(CP_UTF8, 0, (BgUtf16 *)str, (s32)slen, NULL, NULL, NULL, NULL);
+    int chneeded = WideCharToMultiByte(CP_UTF8, 0, (BgUtf16*)str, (s32)slen, NULL, NULL, NULL, NULL);
     BG_ASSERT(chneeded >= 0);
     return (u64)chneeded;
 }
@@ -1664,7 +1823,7 @@ widestr_to_multibyte(const BgUtf16 *ws, char *result, u64 max_size) {
     size_t rv = -1;
     // We shouldn't be using this in linux anyway
     LOG_ERROR("utf32 to utf8 conversion not supported on linux(yet)\n");
-    BG_ASSERT(false);
+    BG_ASSERT(false);    
     // wcstombs(result, (BgUtf16 *)ws, max_size);
     return rv == (size_t)-1 ? NULL : result;
 #endif
@@ -1675,11 +1834,11 @@ multibyte_to_widestr(const char *s, BgUtf16 *result, u64 max_size) {
 #if BG_SYSTEM_WINDOWS
     u64 slen = string_length(s) + 1; // for null termination
     u64 memneeded = memory_needed_for_conversion(s, slen);
-    if (memneeded > max_size)
+    if (memneeded > max_size) 
         return NULL;
 
     int bw = MultiByteToWideChar(CP_UTF8, 0, (LPCCH)s, (s32)slen, result, (s32)(max_size / 2));
-    return ((u64)bw * 2 <= max_size ? result : NULL);
+    return ((u64)bw*2 <= max_size ? result : NULL); 
 #else
     u64 slen = string_length(s);
     u64 mn   = (slen + 1) * 2;
@@ -1719,7 +1878,7 @@ get_fp(File *file) {
 
 bool
 set_fp(File *file, s64 offset) {
-
+    
     if (!is_file_handle_valid(file))
         return false;
 
@@ -1741,9 +1900,9 @@ set_fp(File *file, s64 offset) {
 }
 
 bool
-write_file(File *file, void *data, u64 n) {
+write_file(File *file, const void *data, u64 n) {
 
-    Async_IO_Handle handle ={};
+    Async_IO_Handle handle = {};
     s64 current_fp = get_fp(file);
 
     auto io_result = write__file(file, data, n, current_fp, &handle);
@@ -1756,14 +1915,14 @@ write_file(File *file, void *data, u64 n) {
 }
 
 Async_IO_Handle
-write_file_async(File *file, void *data, u64 n, u64 write_offset) {
-    Async_IO_Handle handle ={};
+write_file_async(File *file, const void *data, u64 n, u64 write_offset) {
+    Async_IO_Handle handle = {};
     write__file(file, data, n, write_offset, &handle);
     return handle;
 }
 
 IO_Result
-write__file(File *file, void *data, u64 n, s64 write_offset, Async_IO_Handle *async_handle) {
+write__file(File *file, const void *data, u64 n, s64 write_offset, Async_IO_Handle *async_handle) {
     bg_unused(async_handle);
 #if BG_SYSTEM_WINDOWS
     DWORD br = 0;
@@ -1791,13 +1950,13 @@ write__file(File *file, void *data, u64 n, s64 write_offset, Async_IO_Handle *as
         async_handle->overlapped.OffsetHigh = (write_offset >> 32);
     }
 
-    auto writefile_result = WriteFile(file->handle, data, (DWORD)n, NULL, &async_handle->overlapped);
-
+    auto writefile_result = WriteFile(file->handle, data, (DWORD)n, NULL, &async_handle->overlapped);   
+    
     if (writefile_result == TRUE) {
         file->cached_fp += n;
         return IO_Result_Done;
     }
-
+    
     auto errcode = GetLastError();
 
     BG_ASSERT(writefile_result == FALSE && errcode == ERROR_IO_PENDING);
@@ -1811,7 +1970,7 @@ write__file(File *file, void *data, u64 n, s64 write_offset, Async_IO_Handle *as
 #endif
 
 #else
-    LOG_WARNING("Linux async io is not implemented(yet!)\n");
+    LOG_WARNING("Linux async io is not implemented(yet!)\n"); 
     ssize_t lsr = lseek64(file->fd, write_offset, SEEK_SET);
     BG_ASSERT(lsr == write_offset);
     if (lsr != write_offset) {
@@ -1823,7 +1982,7 @@ write__file(File *file, void *data, u64 n, s64 write_offset, Async_IO_Handle *as
     if (ws == -1) {
         LOG_ERROR("Unable to write %lld bytes to file\n", n);
         return IO_Result_Error;
-    }
+    } 
 
     file->cached_fp += n;
     return IO_Result_Done;
@@ -1834,7 +1993,7 @@ write__file(File *file, void *data, u64 n, s64 write_offset, Async_IO_Handle *as
 
 bool
 read_file(File *file, void *buffer, u64 n) {
-    Async_IO_Handle handle ={};
+    Async_IO_Handle handle = {};
     auto current_fp = get_fp(file);
     auto io_result  = read__file(file, buffer, n, current_fp, &handle);
 
@@ -1847,8 +2006,8 @@ read_file(File *file, void *buffer, u64 n) {
 
 Async_IO_Handle
 read_file_async(File *file, void *buffer, u64 n, s64 read_offset) {
-    Async_IO_Handle handle ={};
-    read__file(file, buffer, n, read_offset, &handle);
+    Async_IO_Handle handle = {};
+    read__file(file, buffer, n, read_offset, &handle); 
     return handle;
 }
 
@@ -1906,20 +2065,20 @@ read__file(File *file, void *buffer, u64 n, s64 read_offset, Async_IO_Handle *as
     if (readfile_result == TRUE) {
         return IO_Result_Done;
     }
-
+    
     auto errcode = GetLastError();
     BG_ASSERT(readfile_result == FALSE && errcode == ERROR_IO_PENDING);
     if (errcode != ERROR_IO_PENDING) {
         LOG_ERROR("Readfile returned some weird error code %ld\n", errcode);
         return IO_Result_Error;
     }
-
+    
     file->cached_fp += n;
     return IO_Result_Pending;
 #endif
 #else
-    s64 sfpr = set_fp(file, read_offset);
-    BG_ASSERT(sfpr == read_offset);
+    s64 sfpr = set_fp(file, read_offset); 
+    bg_unused(sfpr);
     LOG_WARNING("Async file read for linux not yet implemented\n");
     ssize_t rs = read(file->fd, buffer, n);
     if (rs != (s64)n) {
@@ -1953,7 +2112,7 @@ check_file_async_io(File *file, Async_IO_Handle *async_handle) {
                 return IO_Result_Error;
             }
         }
-
+        
     }
     return IO_Result_Done;
 #else
@@ -1998,7 +2157,7 @@ open_file__raw(const BgUtf16 *fn, File_Open_Flags open_type, File_Access_Flags a
         winapi_access = GENERIC_WRITE | GENERIC_READ;
     }
 
-    File result ={};
+    File result = {};
     result.handle = CreateFileW(fn, winapi_access, winapi_share, 0, winapi_open, 0, 0);
     if (result.handle == INVALID_HANDLE_VALUE) {
         auto errcode = GetLastError();
@@ -2021,7 +2180,7 @@ open_file__raw(const char *fn, File_Open_Flags open_type, File_Access_Flags acce
 #if BG_SYSTEM_LINUX
 File
 open_file__raw(const char *fn, File_Open_Flags open_type, File_Access_Flags access, File_Share_Flags share) {
-
+    
     int fd    = -1;
     int flags = 0;
     int mode  = 0;
@@ -2029,14 +2188,14 @@ open_file__raw(const char *fn, File_Open_Flags open_type, File_Access_Flags acce
     if (File_Open_Flags_Existing == open_type) {
         flags |= (O_CREAT);
     }
-    if (File_Open_Flags_New == open_type) {
+    if (File_Open_Flags_New      == open_type) {
         flags |= (O_CREAT | O_EXCL);
     }
 
 
     if (File_Access_Flags_Read_Only == access) {
         flags |= (O_RDONLY);
-    }
+    } 
     if (File_Access_Flags_Read_And_Write == access) {
         flags |= (O_RDWR);
     }
@@ -2055,7 +2214,7 @@ open_file__raw(const char *fn, File_Open_Flags open_type, File_Access_Flags acce
 
     fd = open(fn, flags, mode);
     if (fd == -1) {
-        LOG_ERROR("Unable to open file %s, flags 0x%X, mode 0x%X\n", fn, flags, mode);
+        LOG_ERROR("Unable to open file %s, flags 0x%X, mode 0x%X\n", fn, flags, mode); 
     }
     File result;
     result.fd = fd;
@@ -2067,7 +2226,7 @@ open_file__raw(const char *fn, File_Open_Flags open_type, File_Access_Flags acce
 
 File
 open_file(const char *fn, File_Access_Flags access, File_Share_Flags share) {
-    return open_file__raw(fn, File_Open_Flags_Existing, access, share);
+    return open_file__raw(fn, File_Open_Flags_Existing, access, share); 
 }
 
 File
@@ -2084,7 +2243,7 @@ create_file(const BgUtf16 *fn, File_Access_Flags access, File_Share_Flags share)
 
 File
 open_file(const BgUtf16 *fn, File_Access_Flags access, File_Share_Flags share) {
-    return open_file__raw(fn, File_Open_Flags_Existing, access, share);
+    return open_file__raw(fn, File_Open_Flags_Existing, access, share); 
 }
 #endif
 
@@ -2103,28 +2262,28 @@ open_file_view(const char *fn) {
     else {
         BgUtf16 *wfn = multibyte_to_widestr(fn);
         File_View result = open_file_view(wfn);
-        bg_free(wfn);
+        bg_free(wfn);        
         return result;
     }
 }
 
 File_View
 open_file_view(const BgUtf16 *fn) {
-    File_View result ={};
+    File_View result = {};
     HANDLE fhandle = CreateFileW(fn, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_ALWAYS, 0, 0);
     if (fhandle != INVALID_HANDLE_VALUE) {
         HANDLE mhandle = CreateFileMappingW(fhandle, NULL, PAGE_READONLY, 0, 0, 0);
         if (mhandle != INVALID_HANDLE_VALUE) {
-            LARGE_INTEGER li ={};
+            LARGE_INTEGER li = {};
             GetFileSizeEx(fhandle, &li);
 
             result.data = MapViewOfFile(mhandle, FILE_MAP_READ, 0, 0, 0);
             result.size = li.QuadPart;
             CloseHandle(mhandle);
-        }
+        }   
         else {
 
-        }
+        } 
         CloseHandle(fhandle);
     }
     else {
@@ -2140,6 +2299,32 @@ close_file_view(File_View *view) {
 }
 #endif
 
+#if BG_SYSTEM_LINUX
+#include <sys/mman.h>
+File_View
+open_file_view(const char *fp) {
+    File_View result = {};
+    FILE* file = fopen(fp, "rb");
+    if(file != 0){
+        int FD = fileno(file);    
+        u64 file_size = get_file_size(fp);
+        void *file_mapped_memory = mmap(0, file_size, PROT_READ, MAP_SHARED_VALIDATE, FD, 0);
+        fclose(file);        
+        if(file_mapped_memory != 0){
+            result.data = (uint8_t*)file_mapped_memory;
+            result.size = file_size;
+        }
+        
+    }
+
+    return result;
+}
+
+void
+close_file_view(File_View *fv) {
+    munmap(fv->data, fv->size);
+}
+#endif
 
 bool
 delete_file(const char *fn) {
@@ -2150,17 +2335,17 @@ delete_file(const char *fn) {
     }
     return winapi_result != 0;
 #else
-
+    
     u64 sl = string_length(fn);
 
     // for small strings, dont heap allocate.
     if (sl + 5 < 1024) {
         char bf[1024];
         zero_memory(bf, sizeof(bf));
-
+        
         u64 u = 0;
-        u = string_append(bf, "rm ", u, 0);
-        u = string_append(bf, fn, u, sl);
+        u = string_append(bf, "rm ", u, 0 );
+        u = string_append(bf, fn   , u, sl);
         system(bf);
     }
     else {
@@ -2170,8 +2355,8 @@ delete_file(const char *fn) {
         zero_memory(bf, bflen);
 
         u64 u = 0;
-        u = string_append(bf, "rm ", u, 0);
-        u = string_append(bf, fn, u, sl);
+        u = string_append(bf, "rm ", u, 0); 
+        u = string_append(bf, fn   , u, sl);
         system(bf);
     }
 
@@ -2218,7 +2403,7 @@ get_file_size(const char *fn) {
     int flags = O_RDONLY;
     // int mode  = 0;
     int fd = open(fn, flags);
-    defer({ close(fd); });
+    defer({close(fd);});
     LOG_INFO("FD : %d, fn : %s\n", fd, fn);
     if (fd != -1) {
         return lseek64(fd, 0, SEEK_END);
@@ -2257,16 +2442,21 @@ get_file_size(const BgUtf16 *fn) {
 u64
 get_file_size(File *file) {
 #if BG_SYSTEM_WINDOWS
-    LARGE_INTEGER li ={};
+    LARGE_INTEGER li = {};
     auto gfr = GetFileSizeEx(file->handle, &li);
     BG_ASSERT(gfr != 0);
     bg_unused(gfr);
     return (u64)li.QuadPart;
 #else
+
     s64 cur = lseek64(file->fd, 0, SEEK_CUR);
     s64 r   = lseek64(file->fd, 0, SEEK_END);
     s64 rr  = lseek64(file->fd, 0, SEEK_SET);
-    BG_ASSERT(rr == cur);
+
+    bg_unused(cur);
+    bg_unused(r);
+    bg_unused(rr);
+    // BG_ASSERT(rr == cur);
     return r;
 #endif
 }
@@ -2288,21 +2478,25 @@ close_file(File *file) {
 File_Read
 read_file_all(const char *fn) {
 
-    File_Read result ={};
+    File_Read result = {};    
     File file = open_file(fn);
 
     if (is_file_handle_valid(&file)) {
+
+        BG_ASSERT(result.len == 0);
         result.len = get_file_size(&file);
+
         if (result.len > 0) {
             result.data = bg_malloc(result.len);
         }
-
+    
         set_fp(&file, 0);
         bool rfr = read_file(&file, result.data, result.len);
-        if (!rfr) {
+        
+        if (!rfr) { 
             LOG_ERROR("Unable to read %llu bytes from file %s\n", result.len, fn);
             bg_free(result.data);
-            result ={};
+            result = {};
         }
     }
 
@@ -2318,7 +2512,7 @@ free_file_read(File_Read *fr) {
 }
 
 
-bool
+bool 
 read_filen_last(const char *fn, void *data, u64 n) {
     auto file      = open_file(fn);
     if (!is_file_handle_valid(&file))
@@ -2326,7 +2520,7 @@ read_filen_last(const char *fn, void *data, u64 n) {
     defer({ close_file(&file); });
 
     auto file_size = get_file_size(&file);
-    if (file_size < n)
+    if (file_size < n) 
         return false;
 
     set_fp(&file, file_size - n);
@@ -2350,7 +2544,7 @@ read_filen(char *fn, void *data, u64 n) {
 }
 
 bool
-dump_file(char *fn, void *d, u64 n) {
+dump_file(char *fn, const void *d, u64 n) {
     auto file = create_file(fn);
     bool wfr = write_file(&file, d, n);
     if (!wfr) {
@@ -2369,6 +2563,63 @@ copy_file_overwrite(char *file, char *dest) {
 bool
 copy_file_overwrite(BgUtf16 *file, BgUtf16 *dest) {
     return CopyFileW((BgUtf16 *)file, dest, true);
+}
+#endif
+
+#if BG_SYSTEM_WINDOWS
+Array<BgUtf16 *>
+get_file_paths_in_directory(const BgUtf16 *dir) {
+
+    BgUtf16 wildcard_dir[280] ={};
+    u64 dirlen = string_length(dir);
+    dirlen++; // null termination
+
+    BG_ASSERT(sizeof(wildcard_dir) > dirlen);
+
+    Array<BgUtf16 *> result ={};
+    arrreserve(&result, 20);
+
+    string_append(wildcard_dir, dir);
+    string_append(wildcard_dir, L"\\*");
+
+    WIN32_FIND_DATAW FDATA;
+    HANDLE FileIterator = FindFirstFileW(wildcard_dir, &FDATA);
+
+    if (FileIterator != INVALID_HANDLE_VALUE) {
+
+        while (FindNextFileW(FileIterator, &FDATA) != 0) {
+
+            //@NOTE(Batuhan): Do not search for sub-directories, skip folders.
+            if (FDATA.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+                continue;
+            }
+
+            // @Stupid +5 just to be sure there is enough room for null termination
+            u64 fn_len = string_length(FDATA.cFileName);
+            fn_len += dirlen + 5;
+
+            BgUtf16 *fnbuffer = (BgUtf16 *)bg_calloc(fn_len, 2);
+
+            u64 slen = 0;
+            slen = string_append(fnbuffer, dir, slen);
+            slen = string_append(fnbuffer, L"\\", slen);
+            slen = string_append(fnbuffer, FDATA.cFileName, slen);
+
+            arrput(&result, fnbuffer);
+
+        }
+
+
+    }
+    else {
+        printf("Cant iterate directory\n");
+    }
+
+
+    FindClose(FileIterator);
+
+    return result;
+
 }
 #endif
 
@@ -2435,10 +2686,26 @@ get_file_paths_in_directory(const char *dir) {
 
 void
 free_filelist(Array<char *> &list) {
-    for_array(i, list) {
-        bg_free(list[i]);
+    for_array (i, list) {
+        bg_free(list[i]);        
     } arrfree(&list);
 }
 
+#if BG_SYSTEM_WINDOWS
+void
+free_filelist(Array<wchar_t *> &list) {
+    for_array (i, list) {
+        bg_free(list[i]);        
+    } arrfree(&list);
+}
 #endif
+
+#endif
+
+
+
+
+
+
+
 

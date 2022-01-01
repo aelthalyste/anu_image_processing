@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include "bg.hpp"
 
-
-
 // from left upper to right bottom
 struct RectangleU16 {
     u16 x, y, w, h;
@@ -59,38 +57,22 @@ struct Downsample_Task_List {
 };
 
 
-struct RGB_YCBCR_Means {
-    u64 r, g, b;
+struct YCBCR_Means {
     u64 y, cb, cr;
 };
 
-struct Image_Size {
-    u64 w, h;
-};
-
-
-struct Linear_Allocator {
-
-    void *memory;
-    unsigned long long cap;
-    unsigned long long used;
-
-    void *allocate(u64 size);
-    void reset();
-
-};
 
 Linear_Allocator
-init_linear_allocator(void *memory, u64 size);
+init_linear_allocator(void *memory, u64 size, u64 aligment);
 
 void
-rgb_to_ycbcr(u8 *__restrict rgb, u8 *__restrict ycbcr, RGB_YCBCR_Means *means, u64 w, u64 h, u64 channels);
+rgb_to_ycbcr(u8 *__restrict rgb, u8 *__restrict ycbcr, YCBCR_Means *means, u64 w, u64 h, u64 channels);
 
 void
 filter_rgb(u8 *__restrict input_rgb, u8 *__restrict output_mask, u64 w, u64 h, u64 input_channel_count);
 
 void
-filter_ycbcr_means(u8 *input_ycbcr, u8 *output_mask, RGB_YCBCR_Means means, s64 cbcrdiff_threshold, u64 w, u64 h, u64 input_channel_count);
+filter_ycbcr_means(u8 *input_ycbcr, u8 *output_mask, YCBCR_Means means, s64 cbcrdiff_threshold, u64 w, u64 h, u64 input_channel_count);
 
 Process_Image_Result
 process_image(u8 *image, u64 w, u64 h, u64 channel_count, Linear_Allocator *allocator);
