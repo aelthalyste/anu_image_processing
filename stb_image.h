@@ -384,7 +384,9 @@ enum
 typedef unsigned char stbi_uc;
 typedef unsigned short stbi_us;
 
+#ifdef __cplusplus
 extern "C" {
+#endif
 
 #ifndef STBIDEF
 #ifdef STB_IMAGE_STATIC
@@ -530,7 +532,9 @@ STBIDEF char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int 
 STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const char *ibuffer, int ilen);
 
 
+#ifdef __cplusplus
 }
+#endif
 
 //
 //
@@ -596,11 +600,19 @@ STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const ch
 #define STBI_ASSERT(x) assert(x)
 #endif
 
+#ifdef __cplusplus
 #define STBI_EXTERN extern "C"
+#else
+#define STBI_EXTERN extern
+#endif
 
 
 #ifndef _MSC_VER
+   #ifdef __cplusplus
    #define stbi_inline inline
+   #else
+   #define stbi_inline
+   #endif
 #else
    #define stbi_inline __forceinline
 #endif
@@ -1020,7 +1032,7 @@ static int stbi__mad3sizes_valid(int a, int b, int c, int add)
 }
 
 // returns 1 if "a*b*c*d + add" has no negative terms/factors and doesn't overflow
-#if !defined(STBI_NO_LINEAR) || !defined(STBI_NO_HDR)
+#if !defined(STBI_NO_LINEAR) || !defined(STBI_NO_HDR) || !defined(STBI_NO_PNM)
 static int stbi__mad4sizes_valid(int a, int b, int c, int d, int add)
 {
    return stbi__mul2sizes_valid(a, b) && stbi__mul2sizes_valid(a*b, c) &&
@@ -1043,7 +1055,7 @@ static void *stbi__malloc_mad3(int a, int b, int c, int add)
    return stbi__malloc(a*b*c + add);
 }
 
-#if !defined(STBI_NO_LINEAR) || !defined(STBI_NO_HDR)
+#if !defined(STBI_NO_LINEAR) || !defined(STBI_NO_HDR) || !defined(STBI_NO_PNM)
 static void *stbi__malloc_mad4(int a, int b, int c, int d, int add)
 {
    if (!stbi__mad4sizes_valid(a, b, c, d, add)) return NULL;
@@ -1298,7 +1310,7 @@ STBI_EXTERN __declspec(dllimport) int __stdcall WideCharToMultiByte(unsigned int
 #if defined(_WIN32) && defined(STBI_WINDOWS_UTF8)
 STBIDEF int stbi_convert_wchar_to_utf8(char *buffer, size_t bufferlen, const wchar_t* input)
 {
-	return WideCharToMultiByte(65001 /* UTF8 */, 0, input, -1, buffer, (int) bufferlen, NULL, NULL);
+   return WideCharToMultiByte(65001 /* UTF8 */, 0, input, -1, buffer, (int) bufferlen, NULL, NULL);
 }
 #endif
 
@@ -1308,15 +1320,15 @@ static FILE *stbi__fopen(char const *filename, char const *mode)
 #if defined(_WIN32) && defined(STBI_WINDOWS_UTF8)
    wchar_t wMode[64];
    wchar_t wFilename[1024];
-	if (0 == MultiByteToWideChar(65001 /* UTF8 */, 0, filename, -1, wFilename, sizeof(wFilename)/sizeof(*wFilename)))
+   if (0 == MultiByteToWideChar(65001 /* UTF8 */, 0, filename, -1, wFilename, sizeof(wFilename)/sizeof(*wFilename)))
       return 0;
 
-	if (0 == MultiByteToWideChar(65001 /* UTF8 */, 0, mode, -1, wMode, sizeof(wMode)/sizeof(*wMode)))
+   if (0 == MultiByteToWideChar(65001 /* UTF8 */, 0, mode, -1, wMode, sizeof(wMode)/sizeof(*wMode)))
       return 0;
 
 #if defined(_MSC_VER) && _MSC_VER >= 1400
-	if (0 != _wfopen_s(&f, wFilename, wMode))
-		f = 0;
+   if (0 != _wfopen_s(&f, wFilename, wMode))
+      f = 0;
 #else
    f = _wfopen(wFilename, wMode);
 #endif
@@ -3253,6 +3265,13 @@ static int stbi__process_frame_header(stbi__jpeg *z, int scan)
    for (i=0; i < s->img_n; ++i) {
       if (z->img_comp[i].h > h_max) h_max = z->img_comp[i].h;
       if (z->img_comp[i].v > v_max) v_max = z->img_comp[i].v;
+   }
+
+   // check that plane subsampling factors are integer ratios; our resamplers can't deal with fractional ratios
+   // and I've never seen a non-corrupted JPEG file actually use them
+   for (i=0; i < s->img_n; ++i) {
+      if (h_max % z->img_comp[i].h != 0) return stbi__err("bad H","Corrupt JPEG");
+      if (v_max % z->img_comp[i].v != 0) return stbi__err("bad V","Corrupt JPEG");
    }
 
    // compute interleaved mcu info
@@ -5248,7 +5267,7 @@ static int stbi__png_is16(stbi__context *s)
    stbi__png p;
    p.s = s;
    if (!stbi__png_info_raw(&p, NULL, NULL, NULL))
-	   return 0;
+      return 0;
    if (p.depth != 16) {
       stbi__rewind(p.s);
       return 0;
@@ -7514,7 +7533,7 @@ static int      stbi__pnm_info(stbi__context *s, int *x, int *y, int *comp)
 static int stbi__pnm_is16(stbi__context *s)
 {
    if (stbi__pnm_info(s, NULL, NULL, NULL) == 16)
-	   return 1;
+      return 1;
    return 0;
 }
 #endif
