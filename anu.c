@@ -4,6 +4,7 @@
 #include <immintrin.h>
 #include <intrin.h>
 
+
 struct RGB_YCBCR_Conversion_Job {
     uint8_t *rgb;
     uint8_t *ycbcr;
@@ -238,13 +239,17 @@ rgb_to_ycbcr(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *me
             Assert(_y < 256);
             Assert(_y >= 16);
 
-            output[x * channels + 0] = _y;
+            
+            output[x * channels + 0] = _y;            
             output[x * channels + 1] = cb;
             output[x * channels + 2] = cr;
+            
 
             tly += _y;
             tlcb += cb;
             tlcr += cr;
+
+
 
         }
         
@@ -471,7 +476,7 @@ extract_rectangles(uint8_t *mask, uint64_t w, uint64_t h, uint64_t *rectangle_co
     
 
     uint64_t rc = 0;
-    uint64_t max_rc_count = w * h / 8;
+    uint64_t max_rc_count = w * h / 2;
     RectangleU16 *rectangles = (RectangleU16 *)linear_allocate(allocator, (max_rc_count) * sizeof(*rectangles));
 
 
@@ -603,6 +608,8 @@ normal + openmp
 Process_Image_Result
 process_image(Job_List *jl, uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Linear_Allocator *allocator) {
     
+    (void)(jl);
+
     Process_Image_Result result;
     memset(&result, 0, sizeof(result));
     result.pure_mask.w = w;
@@ -668,7 +675,22 @@ process_image(Job_List *jl, uint8_t *image, uint64_t w, uint64_t h, uint64_t cha
     uint64_t rect_count = 0;
     RectangleU16 *rectangles = extract_rectangles(result.downsampled_mask.mask, result.downsampled_mask.w, result.downsampled_mask.h, &rect_count, allocator);
 
-    for (uint64_t i =0; i < rect_count; ++i) {  
+    uint64_t i=0;
+    uint64_t rb = 200;
+
+    for (; i+rb-1<rect_count; i+=rb) {
+        for(uint64_t j=0;j<rb;++j) {
+            rectangles[i + j].x = (uint64_t)rectangles[i + j].x * subsample_w_window;
+            rectangles[i + j].y = (uint64_t)rectangles[i + j].y * subsample_h_window;
+            
+            rectangles[i + j].w = (uint64_t)rectangles[i + j].w * subsample_w_window;
+            rectangles[i + j].h = (uint64_t)rectangles[i + j].h * subsample_h_window;            
+        }
+        draw_rectangle_async(jl, image, w, h, channel_count, &rectangles[i], rb, allocator);
+    }
+
+
+    for (; i<rect_count; ++i) {
         RectangleU16 r = rectangles[i];
         
         r.x = (uint64_t)r.x * subsample_w_window;
@@ -680,25 +702,45 @@ process_image(Job_List *jl, uint8_t *image, uint64_t w, uint64_t h, uint64_t cha
         draw_rectangle(image, w, h, channel_count, r);
     }
 
+    synchronize_jobs(jl);
+
+#if 0
+    for (uint64_t i =0; i < rect_count; ++i) {  
+        RectangleU16 r = rectangles[i];
+        
+        r.x = (uint64_t)r.x * subsample_w_window;
+        r.y = (uint64_t)r.y * subsample_h_window;
+        
+        r.w = (uint64_t)r.w * subsample_w_window;
+        r.h = (uint64_t)r.h * subsample_h_window;
+    
+        draw_rectangle(image, w, h, channel_count, r);
+    }
+#endif
+
 #endif
     
 
     return result;
 }
 
-void draw_rectangle_async(Job_List *jl, uint8_t *image, int64_t w, int64_t h, int64_t channels, RectangleU16 rect, Linear_Allocator *allocator) {
+void draw_rectangle_async(Job_List *jl, uint8_t *image, int64_t w, int64_t h, int64_t channels, RectangleU16 *rects, uint64_t rect_count, Linear_Allocator *allocator) {
     Draw_Rect_Async_Params *p = linear_allocate(allocator, sizeof(*p));
     p->image = image;
     p->w = w;
     p->h = h;
     p->channels = channels;
-    p->r = rect;
+    p->r  = rects;
+    p->rc = rect_count;
+    Assert(p->rc < 256);
     queue_job(jl, draw_rectangle_proc_conv, p);
 }
 
 DWORD draw_rectangle_proc_conv(void *arg) {
     Draw_Rect_Async_Params *p = arg;
-    draw_rectangle(p->image, p->w, p->h, p->channels, p->r);
+    for(uint64_t i=0; i<p->rc; ++i)
+        draw_rectangle(p->image, p->w, p->h, p->channels, p->r[i]);
+    return 0;
 }
 
 void draw_rectangle(uint8_t *image, int64_t w, int64_t h, uint64_t channels, RectangleU16 rect) {

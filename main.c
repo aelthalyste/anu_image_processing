@@ -4,6 +4,8 @@
 
 #include <stdio.h>
 #include "anu.h"
+#include "memory.h"
+#include "job.h"
 
 #include "anu_stb_include.h"
 #include <Windows.h>
@@ -79,19 +81,6 @@ static inline int64_t get_perf_freq(void);
 
 // time elapsed in ms
 static inline double time_elapsed_ms(int64_t start);
-
-
-
-void init_job_list(Job_List *jl, uint64_t queue_cap, Linear_Allocator *allocator) {
-    jl->jobs = linear_allocate(allocator, sizeof(jl->jobs[0]) * queue_cap);
-    jl->len = queue_cap;
-    jl->rem = jl->len;
-    jl->begin = 0;
-    jl->end   = 0;
-    jl->terminate_all = 0;
-    InitializeCriticalSection(&jl->add_job_section);
-    InitializeCriticalSection(&jl->consume_job_section);
-}
 
 
 
@@ -255,7 +244,7 @@ static inline uint64_t string_append(char *str, const char *app) {
 
 static inline char ** get_file_paths_in_directory(const char *dir, uint64_t *file_count, Linear_Allocator *allocator) {
     
-    char wildcard_dir[280] ={};
+    char wildcard_dir[280];
     uint64_t dirlen = string_length(dir);
     dirlen++; // null termination
 
@@ -312,86 +301,6 @@ static inline char ** get_file_paths_in_directory(const char *dir, uint64_t *fil
 }
 
 
-void queue_job(Job_List *jl, DWORD (*proc)(void *arg), void *argument) {
-    
-    uint64_t st = start_prof();
-    EnterCriticalSection(&jl->add_job_section);
-
-    Assert(proc);
-
-    while (jl->rem == 0)
-        yield_execution();
-
-    
-    int64_t indx = jl->end;
-    jl->jobs[indx].proc     = proc;
-    jl->jobs[indx].argument = argument;
-    jl->end = (indx + 1) % jl->len;
-    
-    InterlockedDecrement64(&jl->rem);
-    LeaveCriticalSection(&jl->add_job_section);    
-    double elapsed = time_elapsed_ms(st);
-    // printf("q took :  %.4f\n", elapsed);
-
-}
-
-void synchronize_jobs(Job_List *jl) {
-    while (jl->rem != jl->len) {
-        yield_execution();
-    }
-    Assert(jl->rem == jl->len);
-}
-
-DWORD job_poll_thread(void *arg) {
-
-    Job_List *jl = (Job_List *)arg;
-    for (;;) {
-
-        uint32_t consumed = 0;
-        Job job;
-
-        if (jl->terminate_all)
-            break;
-
-        uint64_t consume_st = start_prof();
-
-        EnterCriticalSection(&jl->consume_job_section);
-        if (jl->rem != jl->len) {
-            consumed = 1; 
-            job = jl->jobs[jl->begin];
-            Assert(job.proc != NULL);
-
-            jl->begin = (jl->begin + 1) % jl->len;
-            InterlockedIncrement64(&jl->rem);
-        }
-        LeaveCriticalSection(&jl->consume_job_section);
-
-        if (consumed != 0) {
-
-            uint64_t st = start_prof();
-            double elapsed_consume = time_elapsed_ms(consume_st);
-
-            job.proc(job.argument);
-            double elapsed_proc = time_elapsed_ms(st);
-
-            // if a task runs for lower than 100microseconds, reconsider queuing it.
-            Assert(elapsed > 0.1);
-            // printf("Consume took %.4f, proc took %.4f\n", elapsed_consume, elapsed_proc);
-        }
-        else 
-            yield_execution();
-
-    }
-
-    return 0;
-
-}
-
-DWORD mystupidthread(void *arg) {
-    // Sleep(1);
-    return 0;
-}
-
 int main() {
     
     uint64_t memory_size = 1024 * 1024 * 128;
@@ -410,27 +319,16 @@ int main() {
     init_job_list(jl, 1024 * 4, &allocator);
 
 
-    for (uint64_t i = 0; i < 16; ++i) {
+    for (uint64_t i = 0; i < 12; ++i) {
         HANDLE thread_handle = CreateThread(0, Megabyte(1), job_poll_thread, jl, 0, NULL);
         Assert(thread_handle != INVALID_HANDLE_VALUE);
         CloseHandle(thread_handle);        
     }
 
-    uint64_t st = start_prof();
-    for (uint64_t i = 0; i < 1024 * 4; ++i) {
-        queue_job(jl, mystupidthread, NULL);
-    }
-
-    double elapsed = time_elapsed_ms(st);
-
-    synchronize_jobs(jl);
-    
-    printf("elapsed %.4f ms, us per q : %f\n", elapsed, elapsed / 1024 * 1000.0);
-    return 0;
-
-    const char *input_path   = "C:\\W\\anu_tests\\customtest\\";
+    const char *input_path   = "C:\\W\\anu_tests\\data\\";
     const char *output_path  = "C:\\W\\anu_tests\\output\\";
-
+    (void)(output_path);
+    
 
     uint64_t file_count = 0;
     char **files = get_file_paths_in_directory(input_path, &file_count, &allocator);
@@ -464,6 +362,7 @@ int main() {
         linear_allocator_mark(&allocator, &mark);
 
         Process_Image_Result output = process_image(jl, (uint8_t *)r.image, r.w, r.h, r.channels, &allocator);
+        (void)(output);
 
         process_image_count   += 1;
         total_bytes_processed += (uint64_t)r.w * r.h * r.channels;
