@@ -2,10 +2,8 @@
 
 #include <string.h>
 #include <malloc.h>
+#include "util.h"
 
-#ifndef Assert
-#define Assert(exp) do {if (!(exp)) __debugbreak();} while(0);
-#endif
 
 struct Linear_Allocator {
     void *memory;
@@ -31,7 +29,6 @@ static inline void init_linear_allocator(Linear_Allocator *allocator, void *memo
 }
 
 static inline void * linear_allocate_aligned(Linear_Allocator *allocator, uint64_t s, uint64_t al) {
-    // return _aligned_malloc(s, al);
     uint64_t al_bonus = (uint64_t)((uint8_t *)allocator->memory + allocator->used) % al;
     if (al_bonus)
         al_bonus = al - al_bonus;

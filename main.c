@@ -3,13 +3,19 @@
 #define Gigabyte(val) (Megabyte(val)*1024ll)
 
 #include <stdio.h>
+
 #include "anu.h"
+#include "profile.h"
 #include "memory.h"
 #include "job.h"
 
 #include "anu_stb_include.h"
+
 #include <Windows.h>
 #include <intrin.h>
+
+#define SDL_MAIN_HANDLED 1
+#include "SDL.h"
 
 #pragma comment(lib, "mincore")
 #pragma comment(lib, "User32")
@@ -73,20 +79,16 @@ void  init_image_write_order(Image_Write_Order *order, void *image, int32_t w, i
 void  init_image_load_queue(Image_Load_Queue *queue, uint64_t queue_len, Linear_Allocator *linear_allocator);
 void  free_image(Image_Load_Result *r);
 void  load_image_background(Image_Load_Result *result, const char *path);
-DWORD image_load_thread(void *arg);
 
-// some debug stuff
-static inline int64_t start_prof(void);
-static inline int64_t get_perf_freq(void);
-
-// time elapsed in ms
-static inline double time_elapsed_ms(int64_t start);
+static int image_load_thread(void *arg);
+int image_write_thread(void *arg);
 
 
 
 static inline void image_load_queue_queue(Image_Load_Queue *q, char *path) {
     // wait till queue empties
     while(q->rem==0);
+    
     --q->rem;
     
     load_image_background(&q->arr[q->end], path);
@@ -100,6 +102,17 @@ static inline void image_load_queue_consume(Image_Load_Queue *q, Image_Load_Resu
 
     q->begin = (q->begin + 1) % q->len;
     ++q->rem;
+}
+
+static inline int64_t image_load_queue_test_consume(Image_Load_Queue *q, Image_Load_Result *result) {
+    if (q->arr[q->begin].done == 0)
+        return 0;
+
+    Assert(q->begin < q->len);
+    *result = q->arr[q->begin];
+    q->begin = (q->begin + 1) % q->len;
+    ++q->rem;
+    return 1; 
 }
 
 
@@ -127,7 +140,7 @@ void load_image_background(Image_Load_Result *result, const char *path) {
     global_image_loader.end = (indx + 1) % global_image_loader.len;
 }
 
-DWORD image_load_thread(void *arg) {
+static int image_load_thread(void *arg) {
 
     (void)(arg);
 
@@ -170,7 +183,7 @@ void save_image_background(const char *path, Image_Write_Order *order) {
 }
 
 
-DWORD image_write_thread(void *arg) {
+int image_write_thread(void *arg) {
     
     (void)(arg);
 
@@ -206,27 +219,6 @@ void init_image_write_order(Image_Write_Order *order, void *image, int32_t w, in
 }
 
 
-static inline int64_t start_prof(void){
-    LARGE_INTEGER li;
-    QueryPerformanceCounter(&li);
-    return li.QuadPart;
-}
-
-static inline int64_t get_perf_freq(void){
-    static int64_t cache = 0;
-    if(cache == 0){
-        LARGE_INTEGER i;
-        QueryPerformanceFrequency(&i);
-        cache = i.QuadPart;
-    }
-    return cache;
-}
-
-// time elapsed in ms
-static inline double time_elapsed_ms(int64_t start){
-    return 1000.0*((double)start_prof() - (double)start)/(double)get_perf_freq();
-}
-
 static inline uint64_t string_length(const char *s) {
     const char *b = s;
     for (; *s != 0; s++);
@@ -245,6 +237,7 @@ static inline uint64_t string_append(char *str, const char *app) {
 static inline char ** get_file_paths_in_directory(const char *dir, uint64_t *file_count, Linear_Allocator *allocator) {
     
     char wildcard_dir[280];
+    memset(wildcard_dir, 0, sizeof(wildcard_dir));
     uint64_t dirlen = string_length(dir);
     dirlen++; // null termination
 
@@ -301,29 +294,25 @@ static inline char ** get_file_paths_in_directory(const char *dir, uint64_t *fil
 }
 
 
-int main() {
-    
+int main(int argc, char* argv[]) {
+    (void)(argc);
+    (void)(argv);
+
     uint64_t memory_size = 1024 * 1024 * 128;
-    uint8_t *memory = (uint8_t *)_aligned_malloc(1024 * 1024 * 128, 64);
+    uint8_t *memory = VirtualAlloc(NULL, memory_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     Linear_Allocator allocator;
     init_linear_allocator(&allocator, memory, memory_size, 16);
 
-    //stbi_set_flip_vertically_on_load(true);
+    //stbi_set_flip_vertically_on_load(1);
     //stbi_flip_vertically_on_write(true);
-    HANDLE thread_handle = CreateThread(0, Megabyte(1), image_load_thread, NULL, 0, NULL);
-    Assert(thread_handle != INVALID_HANDLE_VALUE);
-    CloseHandle(thread_handle);
 
-
-    Job_List *jl = linear_allocate(&allocator, sizeof(*jl));
-    init_job_list(jl, 1024 * 4, &allocator);
-
-
-    for (uint64_t i = 0; i < 12; ++i) {
-        HANDLE thread_handle = CreateThread(0, Megabyte(1), job_poll_thread, jl, 0, NULL);
-        Assert(thread_handle != INVALID_HANDLE_VALUE);
-        CloseHandle(thread_handle);        
+    //SDL_Init(SDL_INIT_EVERYTHING);
+    SDL_Init(SDL_INIT_VIDEO);
+    if (NULL == SDL_CreateThread(image_load_thread, "image load thread", (void *)NULL)) {
+        fprintf(stderr, "Unable to create image load thread, reason : %s", SDL_GetError());
+        return 0;
     }
+
 
     const char *input_path   = "C:\\W\\anu_tests\\data\\";
     const char *output_path  = "C:\\W\\anu_tests\\output\\";
@@ -333,19 +322,140 @@ int main() {
     uint64_t file_count = 0;
     char **files = get_file_paths_in_directory(input_path, &file_count, &allocator);
 
-
-
     double total_ms = 0;
     uint64_t process_image_count = 0;
     uint64_t total_bytes_processed = 0;
 
-    
+
     Image_Load_Queue q;
-    init_image_load_queue(&q, 8, &allocator);
+    init_image_load_queue(&q, 32, &allocator);
 
     uint64_t fi = 0;
     uint64_t image_count = file_count;
 
+    uint32_t width  = 1280;
+    uint32_t height = 720;
+
+#if 1
+    SDL_Window* window  = SDL_CreateWindow("SDL pixels", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
+    SDL_Surface* screen = SDL_GetWindowSurface(window);
+    SDL_Surface* pixels = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_RGBA32);
+
+
+    Image_Load_Result loaded_images[4096];
+    memset(loaded_images, 0, sizeof(loaded_images));
+    int64_t lic = 0;
+
+    uint64_t default_image_index = 0;
+    uint8_t *default_image = linear_allocate_zero(&allocator, width * height * 4 * 2);
+    memset(default_image, 0xbb, width * height * 4 * 2);
+    loaded_images[default_image_index].image = default_image;
+    loaded_images[default_image_index].w = width;
+    loaded_images[default_image_index].w = height;
+    loaded_images[default_image_index].done = 1;
+    loaded_images[default_image_index].channels = 4;
+
+    int64_t image_to_be_rendered = 0;
+    int64_t save_this_image = 0;
+    int64_t process_this_image = 0;
+
+    Allocator_Mark allocator_mark;
+    memset(&allocator_mark, 0, sizeof(allocator_mark));
+
+    for(;;) {
+
+        SDL_Event ev;
+        while (SDL_PollEvent(&ev))
+        {
+            if (ev.type == SDL_QUIT)
+                return 0;
+
+            if (ev.type == SDL_KEYDOWN) {
+                
+                if (ev.key.keysym.scancode == SDL_SCANCODE_ESCAPE)
+                    return 0;
+
+                if (ev.key.keysym.scancode == SDL_SCANCODE_E) 
+                    image_to_be_rendered++;
+                if (ev.key.keysym.scancode == SDL_SCANCODE_Q) 
+                    image_to_be_rendered--;
+
+                if (ev.key.keysym.scancode == SDL_SCANCODE_S)
+                    save_this_image = 1;
+                if (ev.key.keysym.scancode == SDL_SCANCODE_S)
+                    process_this_image = 1;
+            }
+
+
+        }
+
+
+        // queue new images and try to consume from queue
+        {
+            int64_t c = q.rem;
+            while(c-- && fi < file_count)
+                image_load_queue_queue(&q, files[fi++]);
+
+            if (image_load_queue_test_consume(&q, &loaded_images[lic+1]))
+                ++lic;
+        }
+
+    
+        if (image_to_be_rendered > lic)
+            image_to_be_rendered = image_to_be_rendered % lic;
+        if (image_to_be_rendered < 0)
+            image_to_be_rendered = lic;
+
+        Image_Load_Result *li = &loaded_images[image_to_be_rendered];
+        if (process_this_image) {
+            process_this_image = 0;
+
+            linear_allocator_mark(&allocator, &allocator_mark);
+
+            Process_Image_Result output = process_image((uint8_t *)li->image, li->w, li->h, li->channels, &allocator);
+
+            linear_allocator_restore(&allocator, allocator_mark);
+            
+        }
+
+        SDL_LockSurface(pixels);
+        {
+            SDL_FillRect(pixels, NULL, 0);
+
+            int yc = height>li->h ? li->h:height;
+            Assert(li->image);
+            
+            memset(pixels->pixels, 0, width * height * 4);           
+            for(int y=0;y<yc;++y) {
+                char *input  = &((char *)li->image)[y*li->w*4];
+                char *output = &((char *)pixels->pixels)[y*pixels->pitch];
+                
+                int copy_size = li->w*4;
+                if (copy_size > pixels->pitch)
+                    copy_size = width*4;
+                memcpy(output, input, copy_size);                
+            }
+
+        }
+        SDL_UnlockSurface(pixels);
+
+
+
+        SDL_BlitSurface(pixels, NULL, screen, NULL);
+        SDL_UpdateWindowSurface(window);
+
+        if (save_this_image) {
+            Image_Load_Result *li = &loaded_images[image_to_be_rendered];
+            stbi_write_bmp("actual_image.bmp", li->w, li->h, 4, li->image);
+            stbi_write_bmp("frame_buffer.bmp", height, width, 4, pixels->pixels);
+            save_this_image = 0;
+        }
+
+    }
+#endif
+
+
+#if 0
     while (image_count) {
         
         int64_t c = q.rem;
@@ -361,12 +471,12 @@ int main() {
         Allocator_Mark mark;
         linear_allocator_mark(&allocator, &mark);
 
-        Process_Image_Result output = process_image(jl, (uint8_t *)r.image, r.w, r.h, r.channels, &allocator);
+        Process_Image_Result output = process_image((uint8_t *)r.image, r.w, r.h, r.channels, &allocator);
         (void)(output);
 
         process_image_count   += 1;
         total_bytes_processed += (uint64_t)r.w * r.h * r.channels;
-        total_ms += time_elapsed_ms(start);
+        total_ms += time_elapsed_ms(start, start_prof());
 
         char bf[1024];
         memset(bf, 0, sizeof(bf));
@@ -384,8 +494,10 @@ int main() {
         linear_allocator_restore(&allocator, mark);
 
     }
-
     printf("Custom implementation : total %.3fms\nav time %.3fms\nbytes processed : %.4fMB, throughput : %.4fMB/ms", total_ms, total_ms / process_image_count, total_bytes_processed / (1024.0 * 1024.0), (double)total_bytes_processed /(1024.0 * 1024.0) / total_ms);
+
+#endif
+
     
     return 0;
 

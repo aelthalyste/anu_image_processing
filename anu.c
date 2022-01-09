@@ -1,26 +1,19 @@
 #include "anu.h"
+#include "profile.h"
 
 #include <string.h>
 #include <immintrin.h>
 #include <intrin.h>
 
 
-struct RGB_YCBCR_Conversion_Job {
-    uint8_t *rgb;
-    uint8_t *ycbcr;
-    int64_t w, h;
-    int64_t channels;
-};
-
 
 void rgb_to_ycbcr_avx2(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *means, uint64_t w, uint64_t h, uint64_t channels) {
     
 
-    int64_t ty = 0, tcb = 0, tcr = 0;
+    int64_t y = 0;
 
 #pragma omp parallel for
-    for (int64_t y = 0; y < (int64_t)h; ++y) {
-
+    for (y = 0; y < (int64_t)h; ++y) {
         uint8_t *__restrict input  = &rgb[(y)*w * channels];
         uint8_t *__restrict output = &ycbcr[(y)*w * channels];
 
@@ -170,10 +163,6 @@ void rgb_to_ycbcr_avx2(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR
             *((uint64_t *)(&output[x * channels]) + 0) = ((uint64_t *)&r)[0];
             *((uint64_t *)(&output[x * channels]) + 1) = ((uint64_t *)&r)[1];
             
-            //t0 = _mm256_add_epi32(_mm256_cvtepuint8_t_epi32(low_r), _mm256_cvtepuint8_t_epi32(hig_r));
-            //ycbcr_mean_vector = _mm_add_epi32(ycbcr_mean_vector, _mm_add_epi32(_mm256_extracti128_si256(t0, 0), _mm256_extracti128_si256(t0, 1)));
-
-
             ycbcr_mean_vector = _mm256_add_epi32(ycbcr_mean_vector, _mm256_add_epi32(_mm256_cvtepu8_epi32(_mm256_extracti128_si256(r, 0)), _mm256_cvtepu8_epi32(_mm256_extracti128_si256(r, 1))));
 
         }
@@ -183,45 +172,27 @@ void rgb_to_ycbcr_avx2(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR
         uint64_t tlcr = ((int32_t *)&ycbcr_mean_vector)[2] + ((int32_t *)&ycbcr_mean_vector)[6];
 
 
-#if 0
-#pragma omp atomic
-        ty += tly;
-
-#pragma omp atomic
-        tcb += tlcb;
-
-#pragma omp atomic
-        tcr+=tlcr;
-#else
-        InterlockedAdd64(&ty , tly);
-        InterlockedAdd64(&tcb, tlcb);
-        InterlockedAdd64(&tcr, tlcr);
-#endif
+        InterlockedAdd64((volatile int64_t *)&means->y, tly);
+        InterlockedAdd64((volatile int64_t *)&means->cb, tlcb);
+        InterlockedAdd64((volatile int64_t *)&means->cr, tlcr);
 
     }
 
-    uint64_t pixel_count = w * h;
-
-    ty  /= pixel_count;
-    tcb /= pixel_count;
-    tcr /= pixel_count;
-
-    means->y = ty;
-    means->cb = tcb;
-    means->cr = tcr;
-
+    means->y  /= w*h;
+    means->cr /= w*h;
+    means->cb /= w*h;
 }
 
 
 void
 rgb_to_ycbcr(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *means, uint64_t w, uint64_t h, uint64_t channels) {
     int64_t ty = 0, tcb = 0, tcr = 0;
+    int64_t y = 0;
 
 #pragma omp parallel for
-    for (int64_t y = 0; y < (int64_t)h; ++y) {
+    for (y = 0; y < (int64_t)h; ++y) {
         uint8_t *__restrict input  = &rgb[y * w * channels];
         uint8_t *__restrict output = &ycbcr[y * w * channels];
-        // thread locals
         uint64_t tly = 0, tlcb = 0, tlcr = 0;
 
 
@@ -240,34 +211,20 @@ rgb_to_ycbcr(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *me
             Assert(_y >= 16);
 
             
-            output[x * channels + 0] = _y;            
-            output[x * channels + 1] = cb;
-            output[x * channels + 2] = cr;
+            output[x * channels + 0] = (uint8_t)_y;            
+            output[x * channels + 1] = (uint8_t)cb;
+            output[x * channels + 2] = (uint8_t)cr;
             
 
             tly += _y;
             tlcb += cb;
             tlcr += cr;
-
-
-
         }
         
 
-#if 0
-#pragma omp atomic
-        ty += tly;
-
-#pragma omp atomic
-        tcb += tlcb;
-
-#pragma omp atomic
-        tcr+=tlcr;
-#else
         InterlockedAdd64(&ty , tly);
         InterlockedAdd64(&tcb, tlcb);
         InterlockedAdd64(&tcr, tlcr);
-#endif
 
     }
 
@@ -286,8 +243,9 @@ rgb_to_ycbcr(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *me
 void
 filter_rgb_avx2(uint8_t *__restrict input_rgb, uint8_t *__restrict output_mask, uint64_t w, uint64_t h, uint64_t input_channel_count) {
     
+    int64_t _y = 0;
 #pragma omp parallel for
-    for (int64_t _y = 0; _y < (int64_t)h; ++_y) {
+    for (_y = 0; _y < (int64_t)h; ++_y) {
 
         uint8_t *__restrict input   = &input_rgb[_y * w * input_channel_count];
         uint8_t *__restrict output  = &output_mask[_y * w];
@@ -308,8 +266,9 @@ filter_rgb_avx2(uint8_t *__restrict input_rgb, uint8_t *__restrict output_mask, 
 void
 filter_rgb(uint8_t *__restrict input_rgb, uint8_t *__restrict output_mask, uint64_t w, uint64_t h, uint64_t input_channel_count) {
 
+    int64_t _y = 0;
 #pragma omp parallel for
-    for (int64_t _y = 0; _y < (int64_t)h; ++_y) {
+    for (_y = 0; _y < (int64_t)h; ++_y) {
         uint8_t *__restrict input   = &input_rgb[_y * w * input_channel_count];
         uint8_t *__restrict output  = &output_mask[_y * w];
 
@@ -328,15 +287,17 @@ filter_rgb(uint8_t *__restrict input_rgb, uint8_t *__restrict output_mask, uint6
 void filter_ycbcr_means(uint8_t *input_ycbcr, uint8_t *output_mask, YCBCR_Means in_means, int64_t cbcrdiff_threshold, uint64_t w, uint64_t h, uint64_t input_channel_count) {
     
     
+    int64_t _y = 0;
 
 #pragma omp parallel for
-    for (int64_t _y = 0; _y < (int64_t)h; ++_y) {
+    for (_y = 0; _y < (int64_t)h; ++_y) {
 
         uint8_t *__restrict input   = &input_ycbcr[_y * w * input_channel_count];
         uint8_t *__restrict output  = &output_mask[_y * w];
         YCBCR_Means means = in_means;
 
-        for (uint64_t x = 0; x < w; ++x) {
+        uint64_t x = 0;
+        for (x = 0; x < w; ++x) {
             uint8_t y  = input[x * input_channel_count + 0];
             uint8_t cb = input[x * input_channel_count + 1];
             uint8_t cr = input[x * input_channel_count + 2];
@@ -359,9 +320,9 @@ void
 apply_binary_mask_to_image(uint8_t *image, uint8_t *binary_mask, uint64_t w, uint64_t h, uint64_t image_channel_count) {
     
     
-
+    int64_t _y = 0;
 #pragma omp parallel for
-    for (int64_t _y = 0; _y < (int64_t)h; ++_y) {
+    for (_y = 0; _y < (int64_t)h; ++_y) {
 
         uint8_t *__restrict input   = &binary_mask[_y * w];
         uint8_t *__restrict output  = &image[_y * w * image_channel_count];
@@ -435,9 +396,9 @@ void
 downsample_mask(uint8_t *mask_input, uint8_t *output, uint64_t w, Downsample_Task_List *list) {
     
     int64_t task_count = list->count;
-
+    int64_t _ti = 0;
 #pragma omp parallel for
-    for (int64_t _ti = 0; _ti < task_count; ++_ti) {
+    for (_ti = 0; _ti < task_count; ++_ti) {
 
         Downsample_Task *task = &list->tasks[_ti];
         Assert(task->xe > task->xs);
@@ -453,7 +414,7 @@ downsample_mask(uint8_t *mask_input, uint8_t *output, uint64_t w, Downsample_Tas
         }
         
         uint64_t pc   = (task->xe - task->xs) * (task->ye - task->ys);
-        output[task->output_indice] = (100 * fc) / pc;
+        output[task->output_indice] = (uint8_t)((100 * fc) / pc);
     }
     
 
@@ -462,22 +423,16 @@ downsample_mask(uint8_t *mask_input, uint8_t *output, uint64_t w, Downsample_Tas
 
 
 
-RectangleU16 *
+RectangleU *
 extract_rectangles(uint8_t *mask, uint64_t w, uint64_t h, uint64_t *rectangle_count_output, Linear_Allocator *allocator) {
     
     // find rectangles with floodfill algorithm
     uint8_t *temp_mask = (uint8_t *)linear_allocate(allocator, w * h);
     memcpy(temp_mask, mask, w * h);
-    
-
-    struct Coordinates {
-        int16_t x, y;
-    };
-    
 
     uint64_t rc = 0;
     uint64_t max_rc_count = w * h / 2;
-    RectangleU16 *rectangles = (RectangleU16 *)linear_allocate(allocator, (max_rc_count) * sizeof(*rectangles));
+    RectangleU *rectangles = linear_allocate(allocator, (max_rc_count) * sizeof(*rectangles));
 
 
     for (uint64_t y = 0; y < h; ++y) {
@@ -486,13 +441,13 @@ extract_rectangles(uint8_t *mask, uint64_t w, uint64_t h, uint64_t *rectangle_co
 
         for (uint64_t x = 0; x < w; ++x) {
         
-            RectangleU16 r;
+            RectangleU r;
             r.x = x;
             r.y = y;
             r.w = 1;
             r.h = 1;
 #if 1
-            if (input[x] > 5)
+            if (input[x] > 12)
                 rectangles[rc++] = r;
 #else
 
@@ -550,12 +505,12 @@ extract_rectangles(uint8_t *mask, uint64_t w, uint64_t h, uint64_t *rectangle_co
                 if (c.y < h)
                     stack.push(Coordinates{ (int16_t)(c.x +  0), (int16_t)(c.y + 1) });
 
-                rectangles[rc++] = RectangleU16{ (uint16_t)c.x, (uint16_t)c.y, 1, 1 };
+                rectangles[rc++] = RectangleU{ (uint16_t)c.x, (uint16_t)c.y, 1, 1 };
 
             }
 
             Assert(rc + 1 < max_rc_count);
-            // RectangleU16 r;
+            // RectangleU r;
           // r.x = left_upper.x;
           // r.y = left_upper.y;
           // r.w = (right_bottom.x - left_upper.x) + 1;
@@ -606,10 +561,8 @@ normal + openmp
 */
 
 Process_Image_Result
-process_image(Job_List *jl, uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Linear_Allocator *allocator) {
+process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Linear_Allocator *allocator) {
     
-    (void)(jl);
-
     Process_Image_Result result;
     memset(&result, 0, sizeof(result));
     result.pure_mask.w = w;
@@ -627,123 +580,70 @@ process_image(Job_List *jl, uint8_t *image, uint64_t w, uint64_t h, uint64_t cha
 
     // bool avx2_supported = true;
     YCBCR_Means means;
-    int64_t avxclocks    = 0;
-    int64_t normalclocks = 0;
-    int64_t ycbcrfilterclocks = 0;
-    int64_t downsampleclocks = 0;
-    int64_t binarymaskclocks = 0;
+    memset(&means, 0, sizeof(means));
 
-    uint32_t tvforrdt = 0;
+
+    PROF_DEFINE(avx2, "myfancydescription");
+    PROF_DEFINE(filtering, "myfancydescription2");
+    PROF_DEFINE(binary_mask, "binary mask");
+    PROF_DEFINE(rectangle_extract_and_draw, "rectangle extraction and draw");
+    PROF_DEFINE(downsample_task, "downsample task");
+
+    PROF_BEGIN(avx2);
+        rgb_to_ycbcr_avx2(image, ycbcr, &means, w, h, channel_count);        
+    PROF_END(avx2);
+
+
+    PROF_BEGIN(filtering);
+        filter_ycbcr_means(ycbcr, result.pure_mask.mask, means, 40, w, h, channel_count);    
+    PROF_END(filtering);
     
-    avxclocks -=__rdtscp(&tvforrdt);
-    rgb_to_ycbcr_avx2(image, ycbcr, &means, w, h, channel_count);
-    avxclocks += __rdtscp(&tvforrdt);
 
-    normalclocks -= __rdtscp(&tvforrdt);
-    // rgb_to_ycbcr(image, ycbcr, &means, w, h, channel_count);
-    normalclocks += __rdtscp(&tvforrdt);
+    PROF_BEGIN(binary_mask);
+        apply_binary_mask_to_image(image, result.pure_mask.mask, w, h, channel_count);
+    PROF_END(binary_mask);
 
 
-#if 1
+    PROF_BEGIN(downsample_task);
+    {
+        prepare_downsample_task(w, h, subsample_w_window, subsample_h_window, &downsample_tasks, allocator);
+        result.downsampled_mask.w = downsample_tasks.output_width;
+        result.downsampled_mask.h = downsample_tasks.output_height;
 
-    ycbcrfilterclocks -= __rdtscp(&tvforrdt);
-    filter_ycbcr_means(ycbcr, result.pure_mask.mask, means, 40, w, h, channel_count);
-    ycbcrfilterclocks += __rdtscp(&tvforrdt);
+        result.downsampled_mask.mask = (uint8_t *)linear_allocate(allocator, downsample_tasks.output_height * downsample_tasks.output_width);
+
+        downsample_mask(result.pure_mask.mask, result.downsampled_mask.mask, w, &downsample_tasks);
+    }
+    PROF_END(downsample_task);
     
-    // filter_rgb(image, result.pure_mask.mask, w, h, channel_count);
-    binarymaskclocks -= __rdtscp(&tvforrdt);
-    apply_binary_mask_to_image(image, result.pure_mask.mask, w, h, channel_count);
-    binarymaskclocks += __rdtscp(&tvforrdt);
 
-
-
-    prepare_downsample_task(w, h, subsample_w_window, subsample_h_window, &downsample_tasks, allocator);
-    result.downsampled_mask.w = downsample_tasks.output_width;
-    result.downsampled_mask.h = downsample_tasks.output_height;
-
-    result.downsampled_mask.mask = (uint8_t *)linear_allocate(allocator, downsample_tasks.output_height * downsample_tasks.output_width);
-
-    downsampleclocks -= __rdtscp(&tvforrdt);
-    downsample_mask(result.pure_mask.mask, result.downsampled_mask.mask, w, &downsample_tasks);
-    downsampleclocks += __rdtscp(&tvforrdt);
-
-    double million = 1000000.0;
-    print("avx clocks %10.4f, normal %10.4f, gain : %.4fx, ycbcrfilter %10.4f, binarymask %10.4f, downsample mask %10.4f\n", avxclocks/million, normalclocks/million, (double)normalclocks/(double)avxclocks, ycbcrfilterclocks/million, binarymaskclocks/million, downsampleclocks/million);
-
-    //print("avx clocks %10llu, normal %10llu, gain : %.4fx, ycbcrfilter %10llu, binarymask %10llu, downsample mask %10llu\n", avxclocks, normalclocks, (double)normalclocks/(double)avxclocks, ycbcrfilterclocks, binarymaskclocks, downsampleclocks);
-
-    uint64_t rect_count = 0;
-    RectangleU16 *rectangles = extract_rectangles(result.downsampled_mask.mask, result.downsampled_mask.w, result.downsampled_mask.h, &rect_count, allocator);
-
-    uint64_t i=0;
-    uint64_t rb = 200;
-
-    for (; i+rb-1<rect_count; i+=rb) {
-        for(uint64_t j=0;j<rb;++j) {
-            rectangles[i + j].x = (uint64_t)rectangles[i + j].x * subsample_w_window;
-            rectangles[i + j].y = (uint64_t)rectangles[i + j].y * subsample_h_window;
+    PROF_BEGIN(rectangle_extract_and_draw);
+    {
+        uint64_t rect_count = 0;
+        RectangleU *rectangles = extract_rectangles(result.downsampled_mask.mask, result.downsampled_mask.w, result.downsampled_mask.h, &rect_count, allocator);
+        
+        for (uint64_t i=0; i < rect_count; ++i) {  
+            RectangleU r = rectangles[i];
             
-            rectangles[i + j].w = (uint64_t)rectangles[i + j].w * subsample_w_window;
-            rectangles[i + j].h = (uint64_t)rectangles[i + j].h * subsample_h_window;            
+            r.x = (uint64_t)r.x * subsample_w_window;
+            r.y = (uint64_t)r.y * subsample_h_window;
+            
+            r.w = (uint64_t)r.w * subsample_w_window;
+            r.h = (uint64_t)r.h * subsample_h_window;
+        
+            draw_rectangle(image, w, h, channel_count, r);
         }
-        draw_rectangle_async(jl, image, w, h, channel_count, &rectangles[i], rb, allocator);
     }
-
-
-    for (; i<rect_count; ++i) {
-        RectangleU16 r = rectangles[i];
-        
-        r.x = (uint64_t)r.x * subsample_w_window;
-        r.y = (uint64_t)r.y * subsample_h_window;
-        
-        r.w = (uint64_t)r.w * subsample_w_window;
-        r.h = (uint64_t)r.h * subsample_h_window;
+    PROF_END(rectangle_extract_and_draw);
     
-        draw_rectangle(image, w, h, channel_count, r);
-    }
 
-    synchronize_jobs(jl);
+    // printf("%5.3f, %5.3f, %5.3f, %5.3f, %5.3f\n", PROF_ELAPSED_MS(avx2), PROF_ELAPSED_MS(filtering), PROF_ELAPSED_MS(binary_mask), PROF_ELAPSED_MS(rectangle_extract_and_draw), PROF_ELAPSED_MS(downsample_task));
 
-#if 0
-    for (uint64_t i =0; i < rect_count; ++i) {  
-        RectangleU16 r = rectangles[i];
-        
-        r.x = (uint64_t)r.x * subsample_w_window;
-        r.y = (uint64_t)r.y * subsample_h_window;
-        
-        r.w = (uint64_t)r.w * subsample_w_window;
-        r.h = (uint64_t)r.h * subsample_h_window;
-    
-        draw_rectangle(image, w, h, channel_count, r);
-    }
-#endif
-
-#endif
-    
 
     return result;
 }
 
-void draw_rectangle_async(Job_List *jl, uint8_t *image, int64_t w, int64_t h, int64_t channels, RectangleU16 *rects, uint64_t rect_count, Linear_Allocator *allocator) {
-    Draw_Rect_Async_Params *p = linear_allocate(allocator, sizeof(*p));
-    p->image = image;
-    p->w = w;
-    p->h = h;
-    p->channels = channels;
-    p->r  = rects;
-    p->rc = rect_count;
-    Assert(p->rc < 256);
-    queue_job(jl, draw_rectangle_proc_conv, p);
-}
-
-DWORD draw_rectangle_proc_conv(void *arg) {
-    Draw_Rect_Async_Params *p = arg;
-    for(uint64_t i=0; i<p->rc; ++i)
-        draw_rectangle(p->image, p->w, p->h, p->channels, p->r[i]);
-    return 0;
-}
-
-void draw_rectangle(uint8_t *image, int64_t w, int64_t h, uint64_t channels, RectangleU16 rect) {
+void draw_rectangle(uint8_t *image, int64_t w, int64_t h, uint64_t channels, RectangleU rect) {
 
     draw_line_hor(image, w, h, channels, rect.y         , rect.x, rect.x + rect.w);
     draw_line_hor(image, w, h, channels, rect.y + rect.h, rect.x, rect.x + rect.w);
@@ -758,17 +658,16 @@ draw_line_hor(uint8_t *image, int64_t w, int64_t h, uint64_t channels, int64_t y
     
     uint64_t line_width = 5;
     
-    int64_t ly = y - line_width / 2;
-    int64_t uy = y + line_width / 2;
-    if (ly < 0)
-        ly = 0;
-    if (uy > h)
-        uy = h;
+    int64_t ly = y - line_width/2;
+    int64_t uy = y + line_width/2;
+    
+    if (ly < 0) ly = 0;
+    if (uy > h) uy = h;
+    if (xe > w) xe = w;
+    
+    int64_t _y = 0;
 
-    if (xe > w)
-        xe = w;
-
-    for (int64_t _y = ly; _y < uy; ++_y) {
+    for (_y = ly; _y < uy; ++_y) {
         uint8_t *input = &image[_y * w * channels];
 
         for (int64_t x = xs; x < xe; ++x) {
@@ -789,13 +688,9 @@ draw_line_ver(uint8_t *image, int64_t w, int64_t h, uint64_t channels, int64_t x
     
     int64_t lx = x - line_width / 2;
     int64_t ux = x + line_width / 2;
-    if (lx < 0)
-        lx = 0;
-    if (ux > w)
-        ux = w;
-
-    if (ye > h)
-        ye = h;
+    if (lx < 0) lx = 0;
+    if (ux > w) ux = w;
+    if (ye > h) ye = h;
 
     for (int64_t _y = ys; _y < ye; ++_y) {
         uint8_t *input = &image[_y * w * channels];

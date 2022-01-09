@@ -8,16 +8,12 @@
 #include "job.h"
 
 
-#ifndef Assert
-#define Assert(exp) do {if (!(exp)) __debugbreak();} while(0);
-// #define Assert(exp) 
-#endif
 
 // from left upper to right bottom
-struct RectangleU16 {
-    uint16_t x, y, w, h;
+struct RectangleU {
+    uint64_t x, y, w, h;
 };
-typedef struct RectangleU16 RectangleU16;
+typedef struct RectangleU RectangleU;
 
 
 
@@ -25,7 +21,7 @@ struct Draw_Rect_Async_Params {
     uint8_t *image;
     int64_t w, h;
     int64_t channels;
-    RectangleU16 *r;
+    RectangleU *r;
     uint64_t rc;
 };
 typedef struct Draw_Rect_Async_Params Draw_Rect_Async_Params;
@@ -71,11 +67,19 @@ typedef struct Downsample_Task_List Downsample_Task_List;
 
 
 struct YCBCR_Means {
-    uint64_t y, cb, cr;
+    int64_t y, cb, cr;
 };
 typedef struct YCBCR_Means YCBCR_Means;
 
 
+struct RGB_YCBCR_Conversion_Job {
+    uint8_t *rgb;
+    uint8_t *ycbcr;
+    int64_t w, h;
+    int64_t channels;
+    YCBCR_Means *means;
+};
+typedef struct RGB_YCBCR_Conversion_Job RGB_YCBCR_Conversion_Job;
 
 #include <Windows.h>
 static void print(const char* msg, ...) {
@@ -91,22 +95,17 @@ static void print(const char* msg, ...) {
     va_end(args);
 }
 
-
 void rgb_to_ycbcr(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *means, uint64_t w, uint64_t h, uint64_t channels);
+void rgb_to_ycbcr_avx2(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *means, uint64_t w, uint64_t h, uint64_t channels);
 void filter_rgb(uint8_t *__restrict input_rgb, uint8_t *__restrict output_mask, uint64_t w, uint64_t h, uint64_t input_channel_count);
 void filter_ycbcr_means(uint8_t *input_ycbcr, uint8_t *output_mask, YCBCR_Means means, int64_t cbcrdiff_threshold, uint64_t w, uint64_t h, uint64_t input_channel_count);
 
-Process_Image_Result process_image(Job_List *jl, uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Linear_Allocator *allocator);
+Process_Image_Result process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Linear_Allocator *allocator);
 
 void prepare_downsample_task(uint64_t w, uint64_t h, uint64_t window_w, uint64_t window_h, Downsample_Task_List *output, Linear_Allocator *allocator);
 void downsample_mask(uint8_t *mask_input, uint8_t *output, uint64_t w, Downsample_Task_List *list);
 
 
-void draw_rectangle(uint8_t *image, int64_t w, int64_t h, uint64_t channels, RectangleU16 rect);
+void draw_rectangle(uint8_t *image, int64_t w, int64_t h, uint64_t channels, RectangleU rect);
 void draw_line_hor(uint8_t *image, int64_t w, int64_t h, uint64_t channels, int64_t y, int64_t xs, int64_t xe);
 void draw_line_ver(uint8_t *image, int64_t w, int64_t h, uint64_t channels, int64_t x, int64_t ys, int64_t ye);
-
-
-
-void draw_rectangle_async(Job_List *jl, uint8_t *image, int64_t w, int64_t h, int64_t channels, RectangleU16 *rects, uint64_t rc, Linear_Allocator *allocator);
-DWORD draw_rectangle_proc_conv(void *arg);

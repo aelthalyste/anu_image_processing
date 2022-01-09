@@ -10,7 +10,7 @@ DWORD job_poll_thread(void *arg) {
 
         uint32_t consumed = 0;
         Job job;
-
+        memset(&job, 0, sizeof(job));
         if (jl->terminate_all)
             break;
 
@@ -23,20 +23,22 @@ DWORD job_poll_thread(void *arg) {
             jl->begin = (jl->begin + 1) % jl->len;
             InterlockedIncrement64(&jl->rem);
         }
+        else
         LeaveCriticalSection(&jl->consume_job_section);
 
         if (consumed != 0) {
+            Assert(job.proc);
 
             uint64_t st = start_prof();
             job.proc(job.argument);
-            double elapsed_proc = time_elapsed_ms(st);
+            double elapsed_proc = time_elapsed_ms(st, start_prof());
 
-            // if a task runs for lower than 100microseconds, reconsider queuing it.
-            Assert(elapsed_proc > 0.1);
-            printf("proc took %.4f\n", elapsed_proc);
+            // if a task runs for lower than 50microseconds, reconsider queuing it.
+            Assert(elapsed_proc > 0.05);
+            // printf("proc took %.4f\n", elapsed_proc);
         }
-        else 
-            yield_execution();
+        // else 
+        //     yield_execution();
 
     }
 
@@ -61,8 +63,8 @@ void queue_job(Job_List *jl, DWORD (*proc)(void *arg), void *argument) {
     Assert(proc);
 
     EnterCriticalSection(&jl->add_job_section);
-    while (jl->rem == 0)
-        yield_execution();
+    while (jl->rem == 0);
+        // yield_execution();
 
     int64_t indx = jl->end;
     jl->jobs[indx].proc     = proc;

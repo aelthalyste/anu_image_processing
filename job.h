@@ -3,10 +3,7 @@
 #include <Windows.h>
 #include <stdint.h>
 #include "memory.h"
-
-#ifndef Assert
-#define Assert(exp) do {if (!(exp)) __debugbreak();} while(0);
-#endif
+#include "util.h"
 
 #define yield_execution() SwitchToThread();
 
