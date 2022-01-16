@@ -8,3 +8,6 @@ vtune_output/*
 *.txt
 *.ilk
 *.lib
+/.vs
+/x64
+/actual_image.bmp

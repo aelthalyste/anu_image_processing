@@ -1,21 +1,21 @@
 #pragma once
 
 #include <Windows.h>
-#include <stdint.h>
+#include "stdint.h"
 #include "memory.h"
 #include "util.h"
 
 #define yield_execution() SwitchToThread();
 
 
-struct Job {
+typedef struct 
+{
     DWORD (*proc)(void *arg);
     void *argument;
-};
-typedef struct Job Job;
+} Job;
 
 
-struct Job_List {
+typedef struct {
     Job *jobs;
     volatile int64_t len;
     volatile int64_t begin;
@@ -24,9 +24,7 @@ struct Job_List {
     volatile int32_t terminate_all;
     CRITICAL_SECTION add_job_section;
     CRITICAL_SECTION consume_job_section;
-};
-typedef struct Job_List Job_List;
-
+} Job_List;
 
 
 void init_job_list(Job_List *jl, uint64_t queue_cap, Linear_Allocator *allocator);

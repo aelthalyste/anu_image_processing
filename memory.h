@@ -2,22 +2,22 @@
 
 #include <string.h>
 #include <malloc.h>
+#include "stdint.h"
 #include "util.h"
 
 
-struct Linear_Allocator {
+typedef struct 
+{
     void *memory;
     uint64_t size;
     uint64_t used;
     uint64_t aligment;
-};
-typedef struct Linear_Allocator Linear_Allocator;
+} Linear_Allocator;
 
-
-struct Allocator_Mark {
+typedef struct 
+{
     uint64_t internal_mark;
-};
-typedef struct Allocator_Mark Allocator_Mark;
+} Allocator_Mark;
 
 
 

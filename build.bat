@@ -6,7 +6,7 @@ set BUILD_TYPE=%1
 :: set debug_build_flags=-O0 -g -fsanitize=address -fno-inline-functions
 :: set release_build_flags=-O3
 
-set common_flags=/arch:AVX2 /W4 /wd4244 -D_CRT_SECURE_NO_WARNINGS=1 /INCREMENTAL:NO /nologo /openmp /ISDL SDL2main.lib SDL2.lib shell32.lib
+set common_flags=/arch:AVX2 /W4 /wd4244 -D_CRT_SECURE_NO_WARNINGS=1 /INCREMENTAL:NO /nologo /openmp /ISDL SDL2main.lib SDL2.lib shell32.lib /permissive
 set debug_build_flags=/Od /DEBUG:FULL /Zi /fsanitize=address
 set release_build_flags=/O2 /GL /GS-
 

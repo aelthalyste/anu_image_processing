@@ -293,6 +293,12 @@ static inline char ** get_file_paths_in_directory(const char *dir, uint64_t *fil
     return result;
 }
 
+int g_mousex;
+int g_mousey;
+int g_mouseleftclick;
+int g_mouserightclick;
+
+
 
 int main(int argc, char* argv[]) {
     (void)(argc);
@@ -306,8 +312,8 @@ int main(int argc, char* argv[]) {
     //stbi_set_flip_vertically_on_load(1);
     //stbi_flip_vertically_on_write(true);
 
-    //SDL_Init(SDL_INIT_EVERYTHING);
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_EVERYTHING);
+    //SDL_Init(SDL_INIT_VIDEO);
     if (NULL == SDL_CreateThread(image_load_thread, "image load thread", (void *)NULL)) {
         fprintf(stderr, "Unable to create image load thread, reason : %s", SDL_GetError());
         return 0;
@@ -322,24 +328,22 @@ int main(int argc, char* argv[]) {
     uint64_t file_count = 0;
     char **files = get_file_paths_in_directory(input_path, &file_count, &allocator);
 
-    double total_ms = 0;
-    uint64_t process_image_count = 0;
-    uint64_t total_bytes_processed = 0;
 
 
     Image_Load_Queue q;
     init_image_load_queue(&q, 32, &allocator);
 
     uint64_t fi = 0;
-    uint64_t image_count = file_count;
 
-    uint32_t width  = 1280;
-    uint32_t height = 720;
+    uint32_t window_width  = 1280;
+    uint32_t window_height = 720;
+    (void)(window_width);
+    (void)(window_height);
 
 #if 1
-    SDL_Window* window  = SDL_CreateWindow("SDL pixels", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_SHOWN);
+    SDL_Window* window  = SDL_CreateWindow("SDL pixels", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_width, window_height, SDL_WINDOW_SHOWN);
     SDL_Surface* screen = SDL_GetWindowSurface(window);
-    SDL_Surface* pixels = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32, SDL_PIXELFORMAT_RGBA32);
+    SDL_Surface* pixels = SDL_CreateRGBSurfaceWithFormat(0, window_width, window_height, 32, SDL_PIXELFORMAT_RGBA32);
 
 
     Image_Load_Result loaded_images[4096];
@@ -347,11 +351,11 @@ int main(int argc, char* argv[]) {
     int64_t lic = 0;
 
     uint64_t default_image_index = 0;
-    uint8_t *default_image = linear_allocate_zero(&allocator, width * height * 4 * 2);
-    memset(default_image, 0xbb, width * height * 4 * 2);
+    uint8_t *default_image = linear_allocate_zero(&allocator, window_width * window_height * 4 * 2);
+    memset(default_image, 0xbb, window_width * window_height * 4 * 2);
     loaded_images[default_image_index].image = default_image;
-    loaded_images[default_image_index].w = width;
-    loaded_images[default_image_index].w = height;
+    loaded_images[default_image_index].w = window_width;
+    loaded_images[default_image_index].w = window_height;
     loaded_images[default_image_index].done = 1;
     loaded_images[default_image_index].channels = 4;
 
@@ -359,10 +363,17 @@ int main(int argc, char* argv[]) {
     int64_t save_this_image = 0;
     int64_t process_this_image = 0;
 
+    uint64_t subsample_window_size = 32;
+
     Allocator_Mark allocator_mark;
     memset(&allocator_mark, 0, sizeof(allocator_mark));
 
+    Process_Image_Result pi_result;
+    memset(&pi_result, 0, sizeof(pi_result));
+
     for(;;) {
+        
+        linear_allocator_mark(&allocator, &allocator_mark);
 
         SDL_Event ev;
         while (SDL_PollEvent(&ev))
@@ -375,15 +386,30 @@ int main(int argc, char* argv[]) {
                 if (ev.key.keysym.scancode == SDL_SCANCODE_ESCAPE)
                     return 0;
 
-                if (ev.key.keysym.scancode == SDL_SCANCODE_E) 
+                if (ev.key.keysym.scancode == SDL_SCANCODE_E) {
                     image_to_be_rendered++;
-                if (ev.key.keysym.scancode == SDL_SCANCODE_Q) 
+                    memset(&pi_result, 0, sizeof(pi_result));
+                }
+                if (ev.key.keysym.scancode == SDL_SCANCODE_Q) {
                     image_to_be_rendered--;
+                    memset(&pi_result, 0, sizeof(pi_result));
+                }
 
                 if (ev.key.keysym.scancode == SDL_SCANCODE_S)
                     save_this_image = 1;
-                if (ev.key.keysym.scancode == SDL_SCANCODE_S)
+                if (ev.key.keysym.scancode == SDL_SCANCODE_W)
                     process_this_image = 1;
+                
+                if (ev.key.keysym.scancode == SDL_SCANCODE_1) {
+                    process_this_image = 1;
+                    if (subsample_window_size > 8)
+                        subsample_window_size -= 8;
+                }
+                if (ev.key.keysym.scancode == SDL_SCANCODE_2) {
+                    process_this_image = 1;
+                    subsample_window_size += 8;
+                }
+
             }
 
 
@@ -407,32 +433,42 @@ int main(int argc, char* argv[]) {
             image_to_be_rendered = lic;
 
         Image_Load_Result *li = &loaded_images[image_to_be_rendered];
+        
+        unsigned char* framebuffer = linear_allocate(&allocator, li->w * li->h * li->channels);
+        int w = li->w;
+        int h = li->h;
+        
+        memcpy(framebuffer, li->image, li->w * li->h * li->channels);
+
         if (process_this_image) {
             process_this_image = 0;
 
-            linear_allocator_mark(&allocator, &allocator_mark);
-
-            Process_Image_Result output = process_image((uint8_t *)li->image, li->w, li->h, li->channels, &allocator);
-
-            linear_allocator_restore(&allocator, allocator_mark);
-            
+            Assert(subsample_window_size != 0);
+                        
+            pi_result= process_image((uint8_t *)framebuffer, li->w, li->h, li->channels, subsample_window_size, subsample_window_size, &allocator);            
         }
+
+
+        for (int i = 0; i < pi_result.rc; ++i)
+            draw_rectangle(framebuffer, w, h, 4, pi_result.rectangles[i]);
+
 
         SDL_LockSurface(pixels);
         {
             SDL_FillRect(pixels, NULL, 0);
 
-            int yc = height>li->h ? li->h:height;
+            int yc = window_height>h ? h : (int)window_height;
             Assert(li->image);
-            
-            memset(pixels->pixels, 0, width * height * 4);           
+            Assert(framebuffer);
+
+            memset(pixels->pixels, 0, window_width * window_height * 4);           
             for(int y=0;y<yc;++y) {
-                char *input  = &((char *)li->image)[y*li->w*4];
+                char *input  = &((char *)framebuffer)[y*w*4];
                 char *output = &((char *)pixels->pixels)[y*pixels->pitch];
                 
-                int copy_size = li->w*4;
+                int copy_size = w*4;
                 if (copy_size > pixels->pitch)
-                    copy_size = width*4;
+                    copy_size = window_width*4;
                 memcpy(output, input, copy_size);                
             }
 
@@ -445,17 +481,24 @@ int main(int argc, char* argv[]) {
         SDL_UpdateWindowSurface(window);
 
         if (save_this_image) {
-            Image_Load_Result *li = &loaded_images[image_to_be_rendered];
             stbi_write_bmp("actual_image.bmp", li->w, li->h, 4, li->image);
-            stbi_write_bmp("frame_buffer.bmp", height, width, 4, pixels->pixels);
+            stbi_write_bmp("frame_buffer.bmp", window_height, window_width, 4, framebuffer);
             save_this_image = 0;
         }
 
+        linear_allocator_restore(&allocator, allocator_mark);
     }
 #endif
 
 
 #if 0
+    uint64_t image_count = file_count;
+
+    uint64_t process_image_count = 0;
+    uint64_t total_bytes_processed = 0;
+
+    double total_ms = 0;
+
     while (image_count) {
         
         int64_t c = q.rem;

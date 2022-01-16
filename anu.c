@@ -8,7 +8,47 @@
 
 
 void rgb_to_ycbcr_avx2(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR_Means *means, uint64_t w, uint64_t h, uint64_t channels) {
+
+    int16_t y_constants[] = {
+        66, 129, 25,0,
+        66, 129, 25,0,
+        66, 129, 25,0,
+        66, 129, 25,0
+    };
+
+    int16_t cb_constants[] = {
+        -38, -75, 112, 0,
+        -38, -75, 112, 0,
+        -38, -75, 112, 0,
+        -38, -75, 112, 0
+    };
+
+    int16_t cr_constants[] = {
+        112, -94, -18, 0,
+        112, -94, -18, 0,
+        112, -94, -18, 0,
+        112, -94, -18, 0
+    };
+
+    int16_t adder_table[] = {
+        16, 16, 128, 128, 128, 128, 0, 0,
+        16, 16, 128, 128, 128, 128, 0, 0
+    };
+
+    uint8_t shuffle8_layout[] = { 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14 };
     
+    __m256i yc_vector;
+    __m256i cbc_vector;
+    __m256i crc_vector;
+    __m256i add_vec;
+    __m256i shuffle8_vec;
+
+    yc_vector = _mm256_loadu_si256((__m256i*) & y_constants);
+    cbc_vector = _mm256_loadu_si256((__m256i*) & cb_constants);
+    crc_vector = _mm256_loadu_si256((__m256i*) & cr_constants);
+    add_vec = _mm256_loadu_si256((__m256i*) & adder_table);
+    shuffle8_vec = _mm256_loadu_si256((__m256i*) & shuffle8_layout);
+
 
     int64_t y = 0;
 
@@ -22,50 +62,10 @@ void rgb_to_ycbcr_avx2(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR
 
         // 4 pixels - 16bytes, __m128i
         // rgba rgba rgba rgba
-
-
-        int16_t y_constants[] ={
-            66, 129, 25,0,
-            66, 129, 25,0,
-            66, 129, 25,0,
-            66, 129, 25,0
-        };
-
-        int16_t cb_constants[] ={
-            -38, -75, 112, 0,
-            -38, -75, 112, 0,
-            -38, -75, 112, 0,
-            -38, -75, 112, 0
-        };
-
-        int16_t cr_constants[] ={
-            112, -94, -18, 0,
-            112, -94, -18, 0,
-            112, -94, -18, 0,
-            112, -94, -18, 0
-        };
-
-        int16_t adder_table[] ={
-            16, 16, 128, 128, 128, 128, 0, 0,
-            16, 16, 128, 128, 128, 128, 0, 0
-        };
-
-        uint8_t shuffle8_layout[]  ={ 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14, 0, 4, 8, 12, 2, 6, 10, 14 };
-        
+                
         // ybra-ybra
         __m256i ycbcr_mean_vector = _mm256_setzero_si256();
         
-        __m256i yc_vector;
-        __m256i cbc_vector;
-        __m256i crc_vector;
-        __m256i add_vec;
-        __m256i shuffle8_vec;
-
-        yc_vector     = _mm256_loadu_si256((__m256i *) & y_constants);
-        cbc_vector    = _mm256_loadu_si256((__m256i *) & cb_constants);
-        crc_vector    = _mm256_loadu_si256((__m256i *) & cr_constants);
-        add_vec       = _mm256_loadu_si256((__m256i *) & adder_table);
-        shuffle8_vec  = _mm256_loadu_si256((__m256i *) & shuffle8_layout);
 
         for (uint64_t x = 0; x < w; x+=4) {
 
@@ -561,7 +561,7 @@ normal + openmp
 */
 
 Process_Image_Result
-process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Linear_Allocator *allocator) {
+process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, uint64_t subsample_w_window, uint64_t subsample_h_window, Linear_Allocator *allocator) {
     
     Process_Image_Result result;
     memset(&result, 0, sizeof(result));
@@ -573,8 +573,6 @@ process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Li
     result.pure_mask.mask = (uint8_t *)linear_allocate(allocator, w * h);    
 
     Downsample_Task_List downsample_tasks;
-    uint64_t subsample_w_window = 32;
-    uint64_t subsample_h_window = 32;
     
     Assert(ycbcr);
 
@@ -616,28 +614,27 @@ process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Li
     }
     PROF_END(downsample_task);
     
-
+    
+#if 1
     PROF_BEGIN(rectangle_extract_and_draw);
     {
-        uint64_t rect_count = 0;
-        RectangleU *rectangles = extract_rectangles(result.downsampled_mask.mask, result.downsampled_mask.w, result.downsampled_mask.h, &rect_count, allocator);
-        
-        for (uint64_t i=0; i < rect_count; ++i) {  
-            RectangleU r = rectangles[i];
-            
-            r.x = (uint64_t)r.x * subsample_w_window;
-            r.y = (uint64_t)r.y * subsample_h_window;
-            
-            r.w = (uint64_t)r.w * subsample_w_window;
-            r.h = (uint64_t)r.h * subsample_h_window;
-        
-            draw_rectangle(image, w, h, channel_count, r);
+        result.rectangles = extract_rectangles(result.downsampled_mask.mask, result.downsampled_mask.w, result.downsampled_mask.h, &result.rc, allocator);
+        for (uint64_t i = 0; i < result.rc; ++i) {
+            result.rectangles[i].x = (uint64_t)result.rectangles[i].x * subsample_w_window;
+            result.rectangles[i].y = (uint64_t)result.rectangles[i].y * subsample_h_window;
+
+            result.rectangles[i].w = (uint64_t)result.rectangles[i].w * subsample_w_window;
+            result.rectangles[i].h = (uint64_t)result.rectangles[i].h * subsample_h_window;
         }
+
+        //for (uint64_t i=0; i < result.rc; ++i)
+        //    draw_rectangle(image, w, h, channel_count, result.rectangles[i]);
+        
     }
     PROF_END(rectangle_extract_and_draw);
-    
+#endif
 
-    // printf("%5.3f, %5.3f, %5.3f, %5.3f, %5.3f\n", PROF_ELAPSED_MS(avx2), PROF_ELAPSED_MS(filtering), PROF_ELAPSED_MS(binary_mask), PROF_ELAPSED_MS(rectangle_extract_and_draw), PROF_ELAPSED_MS(downsample_task));
+    //printf("%5.3f, %5.3f, %5.3f, %5.3f, %5.3f\n", PROF_ELAPSED_MS(avx2), PROF_ELAPSED_MS(filtering), PROF_ELAPSED_MS(binary_mask), PROF_ELAPSED_MS(rectangle_extract_and_draw), PROF_ELAPSED_MS(downsample_task));
 
 
     return result;

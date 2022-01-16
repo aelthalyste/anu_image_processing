@@ -23,7 +23,6 @@ DWORD job_poll_thread(void *arg) {
             jl->begin = (jl->begin + 1) % jl->len;
             InterlockedIncrement64(&jl->rem);
         }
-        else
         LeaveCriticalSection(&jl->consume_job_section);
 
         if (consumed != 0) {

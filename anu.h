@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include "stdint.h"
 #include <string.h>
 #include <windows.h>
 
@@ -10,25 +10,26 @@
 
 
 // from left upper to right bottom
-struct RectangleU {
+typedef struct 
+{
     uint64_t x, y, w, h;
-};
-typedef struct RectangleU RectangleU;
+} RectangleU;
+// typedef struct RectangleU RectangleU;
 
 
 
-struct Draw_Rect_Async_Params {
+typedef struct
+{
     uint8_t *image;
     int64_t w, h;
     int64_t channels;
     RectangleU *r;
     uint64_t rc;
-};
-typedef struct Draw_Rect_Async_Params Draw_Rect_Async_Params;
+} Draw_Rect_Async_Params;
 
 
-
-struct Process_Image_Result {
+typedef struct 
+{
 
     struct {
         uint8_t *mask;
@@ -40,11 +41,14 @@ struct Process_Image_Result {
         uint64_t w, h;
     } pure_mask;
 
-};
-typedef struct Process_Image_Result Process_Image_Result;
+    RectangleU* rectangles;
+    uint64_t    rc;
+
+} Process_Image_Result;
 
 
-struct Downsample_Task {
+typedef struct 
+{
     // input boundaries
     uint64_t xs, ys;
     uint64_t ye, xe;
@@ -53,33 +57,22 @@ struct Downsample_Task {
     uint64_t window_height;
 
     uint64_t output_indice;
-};
-typedef struct Downsample_Task Downsample_Task;
+} Downsample_Task ;
 
-
-struct Downsample_Task_List {
+typedef struct 
+{
     Downsample_Task *tasks;
     uint64_t output_width;
     uint64_t output_height;
     uint64_t count;
-};
-typedef struct Downsample_Task_List Downsample_Task_List;
+} Downsample_Task_List;
 
 
-struct YCBCR_Means {
+typedef struct 
+{
     int64_t y, cb, cr;
-};
-typedef struct YCBCR_Means YCBCR_Means;
+} YCBCR_Means;
 
-
-struct RGB_YCBCR_Conversion_Job {
-    uint8_t *rgb;
-    uint8_t *ycbcr;
-    int64_t w, h;
-    int64_t channels;
-    YCBCR_Means *means;
-};
-typedef struct RGB_YCBCR_Conversion_Job RGB_YCBCR_Conversion_Job;
 
 #include <Windows.h>
 static void print(const char* msg, ...) {
@@ -100,7 +93,7 @@ void rgb_to_ycbcr_avx2(uint8_t *__restrict rgb, uint8_t *__restrict ycbcr, YCBCR
 void filter_rgb(uint8_t *__restrict input_rgb, uint8_t *__restrict output_mask, uint64_t w, uint64_t h, uint64_t input_channel_count);
 void filter_ycbcr_means(uint8_t *input_ycbcr, uint8_t *output_mask, YCBCR_Means means, int64_t cbcrdiff_threshold, uint64_t w, uint64_t h, uint64_t input_channel_count);
 
-Process_Image_Result process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, Linear_Allocator *allocator);
+Process_Image_Result process_image(uint8_t *image, uint64_t w, uint64_t h, uint64_t channel_count, uint64_t subsample_w_window, uint64_t subsample_h_window, Linear_Allocator *allocator);
 
 void prepare_downsample_task(uint64_t w, uint64_t h, uint64_t window_w, uint64_t window_h, Downsample_Task_List *output, Linear_Allocator *allocator);
 void downsample_mask(uint8_t *mask_input, uint8_t *output, uint64_t w, Downsample_Task_List *list);
